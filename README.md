@@ -44,6 +44,35 @@ Kart galerisi ayrı bir web sayfasında: `http://mecaziradio.local:3500`
 
 ## Sıfırdan kurulum
 
+### Kolay yol: tek komut
+
+Cihaza SSH ile bağlan ve şunu çalıştır:
+
+```bash
+curl -fsSL -o /tmp/guncelle.sh \
+  https://raw.githubusercontent.com/mecaz/mecazicards_for_spotify/main/guncelle.sh \
+  && bash /tmp/guncelle.sh
+```
+
+> Neden doğrudan `curl ... | bash` değil? Adres yanlışsa ya da dosya yoksa
+> GitHub bir HTML hata sayfası döndürüyor ve boru hattı **onu komut olarak
+> çalıştırmaya kalkıyor** (`404: command not found`). `-f` bayrağı curl'ün
+> hatada durmasını sağlıyor, `&&` de indirme başarısızsa çalıştırmayı engelliyor.
+
+Kodu GitHub'dan çeker, izinleri düzeltir, kurar ve doğrular. Samba'ya kopyalamaya,
+`chown`/`chmod` uğraşmaya gerek yok. Güncellemek için de aynı komut.
+
+Kart eşleştirmelerine ve ayarlarına **dokunmaz** — onlar `/data/mecazicards-yedek`
+altında duruyor.
+
+Kurulum bitince Volumio arayüzünde **Plugins → mecazicards for Spotify → etkinleştir**.
+
+> Bu script'i `sudo` ile çalıştırma; kendi içinde gereken yerde `sudo` kullanıyor.
+> `volumio plugin install` root olarak çağrılınca izin hatasıyla çöküyor.
+
+Aşağıdaki elle kurulum, internet erişimi olmayan cihazlar ve script'i kullanmak
+istemediğin durumlar için duruyor.
+
 ### ⚠️ En kritik kural
 
 > **`volumio plugin install` komutunu ASLA `sudo` ile çalıştırma.**
@@ -226,8 +255,18 @@ volumio status
 |---|---|
 | Eklenti kodu | `/data/plugins/system_hardware/mecazicards_for_spotify/` |
 | **Kart eşleştirmeleri (yedekle!)** | `/data/configuration/system_hardware/mecazicards_for_spotify/config.json` |
-| Ayarların otomatik yedeği | `.../kullanici-ayarlari-yedegi.json` — güncelleme sonrası buradan geri gelir |
-| Elle yüklenen kapaklar | `.../card-images/` |
+| **Ayarların otomatik yedeği** | `/data/mecazicards-yedek/kullanici-ayarlari-yedegi.json` |
+| Elle yüklenen kapaklar | `.../card-images/` (ayar klasörünün içinde) |
+
+> **Yedek neden `/data` altında, eklentinin yanında değil?** Eklentiyi
+> kaldırdığında Volumio ayar klasörünün **tamamını** siliyor — kartlar, kimlik
+> bilgileri, isimler, hepsi. Yedek de orada dursaydı onunla birlikte giderdi.
+> `/data/mecazicards-yedek/` kaldırma işleminden sağ çıkıyor; eklentiyi yeniden
+> kurduğunda açılışta oradan geri yükleniyor.
+>
+> Klasörün sahibi `volumio` olmalı (`drwx------`). Değilse eklenti yazamaz ve
+> koruma sessizce devre dışı kalır — log'a "Kalıcı yedek klasörüne YAZILAMIYOR"
+> yazar. Düzeltmesi: `sudo chown -R volumio:volumio /data/mecazicards-yedek`
 | go-librespot ayarı | `/data/go-librespot/config.yml` — sahibi `volumio:volumio` olmalı |
 | go-librespot kimliği | `/data/go-librespot/state.json` — **gizli**, paylaşma |
 | Kart galerisi | `http://mecaziradio.local:3500` |

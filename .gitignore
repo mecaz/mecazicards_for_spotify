@@ -20,7 +20,9 @@ mecazicards-geri-yukleme-oncesi-*.json
 .DS_Store
 Thumbs.db
 
-# macOS "AppleDouble" artıkları
+# macOS "AppleDouble" artıkları.
+# Dosyalar Mac'ten Samba/FAT üzerine kopyalanınca her dosyanın yanına bir de
+# ._<ad> sidecar'ı düşüyor. İşe yaramıyorlar ama depoya sızıyorlar.
 ._*
 .AppleDouble
 .AppleDB

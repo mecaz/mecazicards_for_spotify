@@ -24,7 +24,7 @@ const HID_ENTER_CODE = 40;
 // önbelleğinden eski hâliyle çalıştırmaya devam edebiliyor (web/index.html ise
 // her başlangıçta diskten taze okunuyor) - böyle bir uyumsuzluk olduğunda
 // galeri sayfasında hangi kod sürümünün gerçekten çalıştığını görebilmek için.
-const PLUGIN_CODE_VERSION = '3.13.1';
+const PLUGIN_CODE_VERSION = '3.15.1';
 
 module.exports = ControllerMecazicards;
 
@@ -126,6 +126,8 @@ ControllerMecazicards.prototype.persistMappings = function (mappings) {
 // güncellemesi onları silmiyor - kart eşleştirmelerinde öğrendiğimiz ders.
 const CUSTOM_IMAGE_DIR = 'card-images';
 const MAX_CUSTOM_IMAGE_BYTES = 3 * 1024 * 1024;
+// base64 payı + JSON zarfı için pay bırakıyoruz.
+const MAX_REQUEST_BODY_BYTES = 6 * 1024 * 1024;
 
 ControllerMecazicards.prototype.getCustomInfo = function () {
   const self = this;
@@ -233,11 +235,61 @@ const USER_STATE_KEYS = [
   'web_ui_port'
 ];
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function isEmptyConfigValue(v) {
   if (v === null || v === undefined) return true;
   const s = String(v).trim();
   return s === '' || s === '{}';
 }
+
+// Yedeğin ASIL yeri eklentinin ayar klasörü DEĞİL.
+//
+// Kullanıcı güncellemek için eklentiyi önce kaldırıp sonra kuruyordu; Volumio
+// kaldırırken ayar klasörünün tamamını siliyor ve yedek de onunla gidiyordu.
+// Kaldırma işleminde ölen bir yedek, yedek değildir.
+//
+// Bu yüzden asıl kopya /data altında, eklentiden bağımsız bir klasörde.
+// Orası kalıcı bölüm: eklenti kaldırılsa da hayatta kalıyor.
+const DURABLE_BACKUP_DIR = '/data/mecazicards-yedek';
+
+ControllerMecazicards.prototype.getDurableBackupPath = function () {
+  const self = this;
+  try {
+    if (!fs.existsSync(DURABLE_BACKUP_DIR)) {
+      fs.mkdirSync(DURABLE_BACKUP_DIR, { recursive: true, mode: 0o700 });
+    }
+    // Klasör root'a ait oluşturulmuş olabilir (install.sh root çalışıyor). O
+    // hâlde buraya yazamayız ve koruma SESSİZCE devre dışı kalır - cihazda tam
+    // olarak bu yaşandı. Yazma iznini fiilen sınayıp yoksa yüksek sesle
+    // söylüyoruz; sessiz başarısızlık bu projede en pahalıya patlayan hata türü.
+    try {
+      fs.accessSync(DURABLE_BACKUP_DIR, fs.constants.W_OK);
+    } catch (err) {
+      if (!self._durableWarned) {
+        self._durableWarned = true;
+        self.logger.error('[mecazicards_for_spotify] Kalıcı yedek klasörüne YAZILAMIYOR: ' +
+          DURABLE_BACKUP_DIR + ' — düzeltmek için: sudo chown -R volumio:volumio ' +
+          DURABLE_BACKUP_DIR);
+      }
+      return null;
+    }
+    return path.join(DURABLE_BACKUP_DIR, MAPPINGS_SAFETY_FILE);
+  } catch (err) {
+    return null;
+  }
+};
+
+// Okuma sırası: önce kalıcı yer, sonra ayar klasörü, sonra v3.13.0'ın eski
+// biçimi. Hangisi bulunursa oradan devam ediyoruz.
+ControllerMecazicards.prototype.getSafetyCandidates = function () {
+  const self = this;
+  return [self.getDurableBackupPath(), self.getSafetyCopyPath(), self.getSafetyCopyPath(true)]
+    .filter(Boolean);
+};
 
 ControllerMecazicards.prototype.getSafetyCopyPath = function (legacy) {
   const self = this;
@@ -253,8 +305,8 @@ ControllerMecazicards.prototype.getSafetyCopyPath = function (legacy) {
 ControllerMecazicards.prototype.saveUserState = function () {
   const self = this;
   try {
-    const file = self.getSafetyCopyPath();
-    if (!file) return;
+    const hedefler = [self.getDurableBackupPath(), self.getSafetyCopyPath()].filter(Boolean);
+    if (!hedefler.length) return;
 
     const values = {};
     USER_STATE_KEYS.forEach((k) => {
@@ -264,13 +316,43 @@ ControllerMecazicards.prototype.saveUserState = function () {
 
     // Kartlar boşsa yazma: bu büyük ihtimalle ezilmiş bir config demek ve
     // dolu bir yedeği boşla değiştirmek, korumaya çalıştığımız kaybın kendisi.
-    if (isEmptyConfigValue(values.mappings)) return;
+    //
+    // "Boş mu" kontrolü ham metne bakmak DEĞİL, gerçekten ayrıştırmak zorunda:
+    // v-conf config.json'ı atomik yazmıyor, elektrik kesilirse dosya yarım
+    // kalabiliyor (ör. '{"0012":"spotify:play'). Böyle bir metin "boş" değil ama
+    // içi de yok - ham metne baksaydık bozuk veriyi sağlam yedeğin üstüne
+    // yazardık ve 148 kartın son sağlam kopyasını kendi elimizle silerdik.
+    let kartSayisi = 0;
+    try {
+      const m = JSON.parse(values.mappings || '{}');
+      kartSayisi = (m && typeof m === 'object' && !Array.isArray(m)) ? Object.keys(m).length : 0;
+    } catch (err) {
+      self.logger.warn('[mecazicards_for_spotify] config bozuk görünüyor, ' +
+        'ayar yedeğine DOKUNULMADI (mevcut yedek korunuyor).');
+      return;
+    }
+    if (!kartSayisi) return;
 
-    fs.writeFileSync(file, JSON.stringify({
+    const govde = JSON.stringify({
       savedAt: new Date().toISOString(),
       pluginVersion: PLUGIN_CODE_VERSION,
       values: values
-    }, null, 2), 'utf8');
+    }, null, 2);
+
+    // Atomik yazma: doğrudan üstüne yazmak, yazma sırasında elektrik kesilirse
+    // yedeği yarım bırakır - tam da onu lazım edecek anda kullanılamaz olur.
+    // İki yere birden yazıyoruz; asıl olan /data altındaki kalıcı kopya, ayar
+    // klasöründeki ise eklenti dururken elde kolay bulunsun diye.
+    hedefler.forEach((file) => {
+      try {
+        const tmp = file + '.tmp';
+        fs.writeFileSync(tmp, govde, { encoding: 'utf8', mode: 0o600 });
+        try { fs.chmodSync(tmp, 0o600); } catch (e) { /* önemsiz */ }
+        fs.renameSync(tmp, file);
+      } catch (err) {
+        self.logger.warn('[mecazicards_for_spotify] Yedek yazılamadı (' + file + '): ' + err.message);
+      }
+    });
   } catch (err) {
     self.logger.warn('[mecazicards_for_spotify] Ayar yedeği yazılamadı: ' + err.message);
   }
@@ -279,16 +361,25 @@ ControllerMecazicards.prototype.saveUserState = function () {
 // Geriye dönük uyumluluk: v3.13.0 yalnızca eşleştirmeleri saklıyordu.
 ControllerMecazicards.prototype.readSafetyFile = function () {
   const self = this;
-  const yeni = self.getSafetyCopyPath();
-  if (yeni && fs.existsSync(yeni)) {
-    const d = JSON.parse(fs.readFileSync(yeni, 'utf8'));
-    if (d && d.values) return d;
-  }
-  const eski = self.getSafetyCopyPath(true);
-  if (eski && fs.existsSync(eski)) {
-    const d = JSON.parse(fs.readFileSync(eski, 'utf8'));
-    if (d && d.mappings && Object.keys(d.mappings).length) {
-      return { savedAt: d.savedAt, values: { mappings: JSON.stringify(d.mappings) } };
+  // Sıra: kalıcı /data kopyası -> ayar klasörü -> v3.13.0'ın eski biçimi.
+  // Eklenti kaldırılıp yeniden kurulduğunda yalnızca ilki hayatta kalıyor.
+  const adaylar = self.getSafetyCandidates();
+  for (let i = 0; i < adaylar.length; i++) {
+    const yol = adaylar[i];
+    try {
+      if (!fs.existsSync(yol)) continue;
+      const d = JSON.parse(fs.readFileSync(yol, 'utf8'));
+      if (d && d.values && !isEmptyConfigValue(d.values.mappings)) {
+        self.logger.info('[mecazicards_for_spotify] Ayar yedeği bulundu: ' + yol);
+        return d;
+      }
+      // v3.13.0 biçimi
+      if (d && d.mappings && Object.keys(d.mappings).length) {
+        self.logger.info('[mecazicards_for_spotify] Eski biçim yedek bulundu: ' + yol);
+        return { savedAt: d.savedAt, values: { mappings: JSON.stringify(d.mappings) } };
+      }
+    } catch (err) {
+      self.logger.warn('[mecazicards_for_spotify] Yedek okunamadı (' + yol + '): ' + err.message);
     }
   }
   return null;
@@ -441,8 +532,45 @@ ControllerMecazicards.prototype.buildBackup = function () {
     note: 'Kimlik bilgileri (client secret / refresh token) güvenlik gerekçesiyle bu dosyaya DAHİL EDİLMEZ.',
     mappings: mappings,
     resolvedNames: self.getResolvedNames(),
-    playStats: self.getPlayStats()
+    playStats: self.getPlayStats(),
+    // Elle verilen isimler ve kapaklar da yedeğe giriyor. Bunlar Spotify'dan
+    // yeniden çekilemez - kişisel listeler için TEK kaynak kullanıcının kendisi.
+    // Yedek "SD kart ölürse kurtarır" diye duruyorsa, bunları dışarıda bırakmak
+    // onu yarım bir sigortaya çevirirdi.
+    customInfo: self.getCustomInfo(),
+    customImages: self.collectCustomImages()
   };
+};
+
+// Kapak görsellerini data-URL olarak topla. Yedek dosyası tek parça olsun diye
+// gömüyoruz; ama sınırsız değil - çok büyürse isimleri alıp görselleri atlıyoruz
+// ve bunu yedeğin içine yazıyoruz ki kullanıcı neyin eksik olduğunu bilsin.
+const BACKUP_IMAGE_BUDGET_BYTES = 24 * 1024 * 1024;
+
+ControllerMecazicards.prototype.collectCustomImages = function () {
+  const self = this;
+  const out = {};
+  try {
+    const info = self.getCustomInfo();
+    const dir = self.getCustomImageDir();
+    let toplam = 0;
+    Object.keys(info).forEach((id) => {
+      const dosya = info[id] && info[id].image;
+      if (!dosya) return;
+      try {
+        const tam = path.join(dir, dosya);
+        const st = fs.statSync(tam);
+        if (toplam + st.size > BACKUP_IMAGE_BUDGET_BYTES) return;
+        const ext = path.extname(dosya).toLowerCase().replace('.', '');
+        const mime = ext === 'png' ? 'image/png' : (ext === 'webp' ? 'image/webp' : 'image/jpeg');
+        out[id] = 'data:' + mime + ';base64,' + fs.readFileSync(tam).toString('base64');
+        toplam += st.size;
+      } catch (err) { /* tek bir görsel okunamadıysa yedeği durdurmaya değmez */ }
+    });
+  } catch (err) {
+    self.logger.warn('[mecazicards_for_spotify] Kapaklar yedeğe alınamadı: ' + err.message);
+  }
+  return out;
 };
 
 // Yedek dosyasını sıkı doğrula. Bozuk bir dosyayı geri yüklemek 148 kartlık
@@ -532,9 +660,40 @@ ControllerMecazicards.prototype.applyBackup = function (data, mode) {
     stats = Object.keys(data.playStats).length;
   }
 
+  // Elle verilen isim ve kapakları geri yükle. Mevcut olanı EZMİYORUZ:
+  // eldeki taze bilgi eski bir yedekten daha değerlidir.
+  let ozel = 0;
+  if (data.customInfo && typeof data.customInfo === 'object' && !Array.isArray(data.customInfo)) {
+    const cur = self.getCustomInfo();
+    Object.keys(data.customInfo).forEach((id) => {
+      let temizId;
+      try { temizId = safeCardId(id); } catch (err) { return; }
+      if (cur[temizId]) return;                       // eldeki üstün
+      const gelen = data.customInfo[id] || {};
+      const kayit = {};
+      if (typeof gelen.name === 'string' && gelen.name.trim()) {
+        kayit.name = gelen.name.trim().slice(0, 200);
+      }
+      const dataUrl = data.customImages && data.customImages[id];
+      if (dataUrl) {
+        try {
+          const yazilan = self.saveCustomCardInfo(temizId, kayit.name || null, dataUrl, false);
+          if (yazilan) { ozel++; return; }
+        } catch (err) {
+          self.logger.warn('[mecazicards_for_spotify] Kapak geri yüklenemedi (' +
+            temizId + '): ' + err.message);
+        }
+      }
+      if (kayit.name) {
+        try { self.saveCustomCardInfo(temizId, kayit.name, null, false); ozel++; }
+        catch (err) { /* geçersiz kayıt, atla */ }
+      }
+    });
+  }
+
   const afterCount = Object.keys(next).length;
   self.logger.info('[mecazicards_for_spotify] Geri yükleme (' + mode + '): ' +
-    beforeCount + ' -> ' + afterCount + ' kart');
+    beforeCount + ' -> ' + afterCount + ' kart, ' + ozel + ' özel isim/kapak');
 
   return {
     mode: mode,
@@ -544,6 +703,7 @@ ControllerMecazicards.prototype.applyBackup = function (data, mode) {
     skipped: parsed.skipped,
     names: names,
     stats: stats,
+    custom: ozel,
     snapshot: snapshot
   };
 };
@@ -1005,7 +1165,31 @@ ControllerMecazicards.prototype.refreshAllNames = function (forceAll) {
   }
 
   nextBatch().then(() => {
-    self.persistResolvedNames(names);
+    // Kaydetme sırasında diskte yer kalmamışsa (SD kartlarda en sık görülen
+    // arıza) config.set fırlatır. Yakalamazsak defer NE çözülür NE reddedilir:
+    // /api/refresh-names hiç cevap vermez, bağlantı açık kalır, tarayıcı
+    // sebebi anlaşılmayan bir "Failed to fetch" gösterir.
+    try {
+      // Uzun ağ turu boyunca elde tuttuğumuz kopya bayatlamış olabilir: bu
+      // sırada silinmiş bir kartın ismini geri getirmeyelim, bu sırada
+      // güncellenmiş bir ismi de ezmeyelim.
+      const guncel = self.getResolvedNames();
+      const kartlar = self.getMappings();
+      const birlesik = {};
+      Object.keys(guncel).forEach((id) => {
+        if (kartlar[id]) birlesik[id] = guncel[id];
+      });
+      Object.keys(names).forEach((id) => {
+        if (kartlar[id] && cardIds.indexOf(id) !== -1) birlesik[id] = names[id];
+      });
+      self.persistResolvedNames(birlesik);
+    } catch (err) {
+      self.logger.error('[mecazicards_for_spotify] İsimler kaydedilemedi: ' + err.message);
+      defer.reject(new Error('İsimler çekildi ama kaydedilemedi: ' + err.message +
+        ' (diskte yer kalmamış olabilir)'));
+      return;
+    }
+
     if (failed) {
       self.logger.warn('[mecazicards_for_spotify] ' + failed + ' isim çekilemedi. Son hata: ' + lastError);
     }
@@ -1013,6 +1197,9 @@ ControllerMecazicards.prototype.refreshAllNames = function (forceAll) {
       resolved: resolved, failed: failed, skipped: totalSkipped,
       viaOembed: viaOembed, viaLibrary: viaLibrary, lastError: lastError
     });
+  }).fail((err) => {
+    self.logger.error('[mecazicards_for_spotify] İsim yenilemede beklenmedik hata: ' + err.message);
+    defer.reject(err);
   });
 
   return defer.promise;
@@ -1031,14 +1218,35 @@ ControllerMecazicards.prototype.startCardReader = function () {
   }
 
   self.logger.info('[mecazicards_for_spotify] Kart okuyucu dinleniyor: ' + devicePath);
-  self.hidStream = fs.createReadStream(devicePath);
 
-  self.hidStream.on('error', (err) => {
-    self.logger.error('[mecazicards_for_spotify] HID okuma hatası: ' + err.message + '. 5sn sonra tekrar denenecek.');
-    self.hidRetryTimeout = setTimeout(() => self.startCardReader(), 5000);
-  });
+  // Yeni akış açmadan ÖNCE eskisini kapat.
+  //
+  // Bu olmadan şöyle bozuluyordu: okuyucuyu çıkarıp takınca eski akış 'error'
+  // veriyor, yeniden başlatma zamanlanıyor - ama eski akış kapatılmadığı için
+  // dinleyicileri üstünde kalıyor ve dosya tanıtıcısı sızıyor. İki takıp
+  // çıkarmadan sonra AYNI baytları iki akış birden işliyor, tampon
+  // "11223344..." gibi ikizleniyor ve hiçbir kart eşleşmiyor.
+  self.closeHidStream();
 
-  self.hidStream.on('data', (chunk) => {
+  const stream = fs.createReadStream(devicePath);
+  self.hidStream = stream;
+
+  const retry = (ms, sebep) => {
+    // Yalnızca GÜNCEL akış yeniden başlatmayı tetikleyebilsin; kapatılmış eski
+    // bir akışın geç gelen hatası ikinci bir zincir başlatmasın.
+    if (self.hidStream !== stream) return;
+    self.closeHidStream();
+    if (self.hidRetryTimeout) clearTimeout(self.hidRetryTimeout);
+    self.hidRetryTimeout = setTimeout(() => self.startCardReader(), ms);
+    self.logger.error('[mecazicards_for_spotify] HID: ' + sebep +
+      ' — ' + (ms / 1000) + 'sn sonra tekrar denenecek.');
+  };
+
+  stream.on('error', (err) => retry(5000, 'okuma hatası: ' + err.message));
+  stream.on('close', () => { if (self.hidStream === stream) retry(3000, 'akış kapandı'); });
+
+  stream.on('data', (chunk) => {
+    if (self.hidStream !== stream) return;   // kapatılmış akıştan gelen artık veri
     if (chunk.length >= 3) {
       const keyCode = chunk[2];
       if (keyCode !== 0) {
@@ -1048,17 +1256,29 @@ ControllerMecazicards.prototype.startCardReader = function () {
   });
 };
 
+ControllerMecazicards.prototype.closeHidStream = function () {
+  const self = this;
+  if (!self.hidStream) return;
+  const eski = self.hidStream;
+  self.hidStream = null;
+  try {
+    eski.removeAllListeners();
+    eski.destroy();
+  } catch (err) { /* zaten kapalıysa önemsiz */ }
+};
+
 ControllerMecazicards.prototype.stopCardReader = function () {
   const self = this;
   if (self.hidRetryTimeout) {
     clearTimeout(self.hidRetryTimeout);
     self.hidRetryTimeout = null;
   }
-  if (self.hidStream) {
-    self.hidStream.removeAllListeners();
-    self.hidStream.destroy();
-    self.hidStream = null;
+  if (self.readingTimeout) {
+    clearTimeout(self.readingTimeout);
+    self.readingTimeout = null;
   }
+  self.readingBuffer = '';
+  self.closeHidStream();
 };
 
 // -------------------- triggerhappy çakışma engelleyici --------------------
@@ -1189,18 +1409,49 @@ ControllerMecazicards.prototype.listInputEventDevices = function () {
   return results;
 };
 
+// Kart okuyucu rakamları tek tek "yazıyor", sonunda Enter gönderiyor. Tamponu
+// yalnızca Enter temizliyordu; bu iki şekilde bozuluyor:
+//   - Kart okuyucudan yarıda çekilirse yarım numara tamponda kalıyor ve BİR
+//     SONRAKİ okumanın başına yapışıyor ("0007" + "0012345678") -> eşleşme yok.
+//   - Enter hiç gelmezse tampon sınırsız büyüyor.
+// Bu yüzden hem sessizlik zaman aşımı hem de uzunluk sınırı var.
+const CARD_INPUT_TIMEOUT_MS = 400;
+const CARD_ID_MAX_LEN = 32;
+
 ControllerMecazicards.prototype.handleKeyCode = function (code) {
   const self = this;
+
+  if (self.readingTimeout) clearTimeout(self.readingTimeout);
+
   if (code === HID_ENTER_CODE) {
+    self.readingTimeout = null;
     if (self.readingBuffer.length > 0) {
       const cardId = self.readingBuffer;
+      self.readingBuffer = '';
       self.logger.info('[mecazicards_for_spotify] Kart okundu: ' + cardId);
       self.lastCardId = cardId;
       self.triggerSpotify(cardId);
     }
     self.readingBuffer = '';
-  } else if (HID_KEYMAP[code]) {
+    return;
+  }
+
+  if (HID_KEYMAP[code]) {
+    if (self.readingBuffer.length >= CARD_ID_MAX_LEN) {
+      self.logger.warn('[mecazicards_for_spotify] Kart numarası beklenenden uzun, ' +
+        'tampon sıfırlandı.');
+      self.readingBuffer = '';
+    }
     self.readingBuffer += HID_KEYMAP[code];
+    // Yarım kalan okuma bir sonrakine bulaşmasın.
+    self.readingTimeout = setTimeout(() => {
+      if (self.readingBuffer) {
+        self.logger.warn('[mecazicards_for_spotify] Yarım kalan okuma atıldı: ' +
+          self.readingBuffer);
+      }
+      self.readingBuffer = '';
+      self.readingTimeout = null;
+    }, CARD_INPUT_TIMEOUT_MS);
   }
 };
 
@@ -1765,7 +2016,10 @@ ControllerMecazicards.prototype.startWebServer = function () {
     let raw = '';
     req.on('data', (chunk) => {
       raw += chunk;
-      if (raw.length > 1e6) { req.destroy(); reject(new Error('İstek gövdesi çok büyük.')); }
+      // Görsel sınırı 3 MB; base64 ~%33 şişirdiği için gövde sınırı ondan
+      // BÜYÜK olmalı, yoksa kapak yükleme sunucuya hiç ulaşmadan kopuyor
+      // ve kullanıcı sebepsiz bir ağ hatası görüyor.
+      if (raw.length > MAX_REQUEST_BODY_BYTES) { req.destroy(); reject(new Error('İstek gövdesi çok büyük.')); }
     });
     req.on('end', () => {
       if (!raw) return resolve({});
@@ -1774,8 +2028,36 @@ ControllerMecazicards.prototype.startWebServer = function () {
     req.on('error', reject);
   });
 
+  // CSRF koruması.
+  //
+  // Bu sunucu ev ağında, kimlik doğrulaması olmadan duruyor. readBody gövdeyi
+  // Content-Type'a bakmadan JSON olarak ayrıştırdığı için, dışarıdaki herhangi
+  // bir web sayfası "basit istek" (preflight'sız) göndererek kartları silebilir
+  // ya da geri yükleme tetikleyebilirdi. Tarayıcı bu tür isteklere Origin
+  // başlığı ekliyor; kendi sayfamızdan gelmeyen DEĞİŞTİRİCİ istekleri
+  // reddediyoruz. Origin'i hiç olmayanlar (curl, script) geçebiliyor - amaç
+  // tarayıcı üzerinden yapılan siteler-arası saldırıyı kesmek.
+  const originAllowed = (req) => {
+    const origin = req.headers.origin;
+    if (!origin) return true;
+    try {
+      const o = new URL(origin);
+      const host = (req.headers.host || '').split(':')[0];
+      return o.hostname === host || o.hostname === '127.0.0.1' || o.hostname === 'localhost';
+    } catch (err) {
+      return false;
+    }
+  };
+
   const handleApi = async (req, res, urlPath) => {
     try {
+      if (req.method !== 'GET' && !originAllowed(req)) {
+        self.logger.warn('[mecazicards_for_spotify] Farklı kaynaktan gelen istek ' +
+          'reddedildi: ' + req.headers.origin + ' -> ' + urlPath);
+        return sendJson(res, 403, { ok: false,
+          error: 'Bu istek başka bir sayfadan geldiği için reddedildi.' });
+      }
+
       if (req.method === 'GET' && urlPath === '/api/state') {
         const mappings = self.getMappings();
         const names = self.getResolvedNames();
@@ -2044,8 +2326,12 @@ ControllerMecazicards.prototype.startWebServer = function () {
 
     if (urlPath === '/spotify-connect/callback') {
       if (query.error) {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end('<h2>Yetkilendirme reddedildi: ' + query.error + '</h2>');
+        // XSS: query.error adres çubuğundan gelir ve bu dal state kontrolünden
+        // ÖNCE çalışır - yani kimlik doğrulaması olmadan. Kaçırılmadan basılırsa
+        // saldırganın script'i galeri sayfasının kaynağında çalışır ve oradan
+        // bütün API uçları aynı kaynaktan erişilebilir olur.
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h2>Yetkilendirme reddedildi: ' + escapeHtml(query.error) + '</h2>');
         return;
       }
       if (!self.isValidOauthState(query.state) || !query.code) {
@@ -2436,6 +2722,18 @@ ControllerMecazicards.prototype.removeMappingCore = function (rawCardId) {
   if (Object.prototype.hasOwnProperty.call(names, cardId)) {
     delete names[cardId];
     self.persistResolvedNames(names);
+  }
+
+  // Elle verilen isim/kapağı da temizle. Aksi hâlde kapak dosyası diskte öksüz
+  // kalıyor ve aynı kart numarası ileride BAŞKA bir listeye eşlenirse eski
+  // isim/kapak yeni listenin üstünde görünüyordu.
+  try {
+    const ozel = self.getCustomInfo();
+    if (Object.prototype.hasOwnProperty.call(ozel, cardId)) {
+      self.saveCustomCardInfo(cardId, '', null, true);
+    }
+  } catch (err) {
+    self.logger.warn('[mecazicards_for_spotify] Özel isim/kapak temizlenemedi: ' + err.message);
   }
 
   return { cardId: cardId };

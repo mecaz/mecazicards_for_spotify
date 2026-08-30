@@ -21,7 +21,18 @@ UDEV_RULE_FILE="/etc/udev/rules.d/99-mecazicards.rules"
 # Kopya paketin içinde olmadığı için güncelleme onu ezemiyor.
 # -------------------------------------------------------
 RUNTIME_CFG="/data/configuration/system_hardware/mecazicards_for_spotify/config.json"
-SAFETY_COPY="/data/configuration/system_hardware/mecazicards_for_spotify/kullanici-ayarlari-yedegi.json"
+# Yedeğin ASIL yeri /data altında: eklenti kaldırılınca ayar klasörü tamamen
+# siliniyor (cihazda doğrulandı), oradaki kopya da onunla birlikte gidiyor.
+DURABLE_DIR="/data/mecazicards-yedek"
+SAFETY_COPY="$DURABLE_DIR/kullanici-ayarlari-yedegi.json"
+mkdir -p "$DURABLE_DIR" 2>/dev/null || true
+# Sahiplik KOŞULSUZ verilmeli. Bu satırlar önce "config varsa" bloğunun
+# içindeydi; kullanıcı eklentiyi kaldırıp kurunca config olmadığı için blok
+# atlanıyor ve klasör root:root kalıyordu. Eklenti volumio olarak çalıştığından
+# yedeği oraya hiç yazamıyordu - koruma sessizce devre dışı kalıyordu.
+chown -R volumio:volumio "$DURABLE_DIR" 2>/dev/null || true
+chmod 700 "$DURABLE_DIR" 2>/dev/null || true
+
 if [ -f "$RUNTIME_CFG" ]; then
   python3 - "$RUNTIME_CFG" "$SAFETY_COPY" <<'SAFETYEOF' 2>/dev/null || true
 import json, sys, datetime
@@ -56,6 +67,12 @@ print('[mecazicards] %d kart ve %d ayar güvenceye alındı.'
 SAFETYEOF
   chown volumio:volumio "$SAFETY_COPY" 2>/dev/null || true
   chmod 600 "$SAFETY_COPY" 2>/dev/null || true
+fi
+
+# Kaldırma sonrası yeniden kurulumda ayar klasörü hiç yok; yedek /data altında
+# beklemeye devam ediyor ve eklenti açılışta oradan geri yüklüyor.
+if [ -f "$SAFETY_COPY" ] && [ ! -f "$RUNTIME_CFG" ]; then
+  echo "Önceki kurulumdan ayar yedeği bulundu; eklenti açılışta geri yükleyecek."
 fi
 
 # -------------------------------------------------------
