@@ -1,0 +1,215 @@
+{
+  "page": {
+    "label": "mecazicards for Spotify"
+  },
+  "sections": [
+    {
+      "id": "section_general",
+      "element": "section",
+      "label": "Kart Okuyucu Ayarları",
+      "icon": "fa-id-card",
+      "description": "",
+      "onSave": {
+        "type": "controller",
+        "endpoint": "system_hardware/mecazicards_for_spotify",
+        "method": "saveGeneralSettings"
+      },
+      "saveButton": {
+        "label": "Kaydet",
+        "data": ["hid_device_path", "input_event_device_path"]
+      },
+      "content": [
+        {
+          "id": "hid_device_path",
+          "element": "select",
+          "label": "Kart Okuyucu Cihazı (HID)",
+          "value": { "value": "/dev/mecazicards_hid", "label": "/dev/mecazicards_hid (sabit - önerilen)" },
+          "options": [
+            { "value": "/dev/mecazicards_hid", "label": "/dev/mecazicards_hid (sabit - önerilen)" }
+          ]
+        },
+        {
+          "id": "input_event_device_path",
+          "element": "select",
+          "label": "Aynı okuyucunun klavye (evdev) arayüzü - triggerhappy çakışmasını engellemek için kilitlenir",
+          "value": { "value": "/dev/mecazicards_input", "label": "/dev/mecazicards_input (sabit - önerilen)" },
+          "options": [
+            { "value": "/dev/mecazicards_input", "label": "/dev/mecazicards_input (sabit - önerilen)" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "section_playback",
+      "element": "section",
+      "label": "Çalma Yöntemi",
+      "icon": "fa-play-circle",
+      "description": "",
+      "onSave": {
+        "type": "controller",
+        "endpoint": "system_hardware/mecazicards_for_spotify",
+        "method": "savePlaybackMode"
+      },
+      "saveButton": {
+        "label": "Kaydet",
+        "data": ["playback_mode"]
+      },
+      "content": [
+        {
+          "id": "playback_mode",
+          "element": "select",
+          "label": "Kart okutulunca müzik nasıl başlatılsın?",
+          "value": { "value": "auto", "label": "Otomatik (önerilen)" },
+          "options": [
+            { "value": "auto", "label": "Otomatik — önce Spotify Connect, olmazsa Volumio'nun kendi yöntemi" },
+            { "value": "connect", "label": "Sadece Spotify Connect" },
+            { "value": "local", "label": "Sadece Volumio'nun kendi yöntemi (yerel)" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "section_spotify_credentials",
+      "element": "section",
+      "label": "Spotify API Kimlik Bilgileri (isim gösterimi için)",
+      "icon": "fa-key",
+      "description": "",
+      "onSave": {
+        "type": "controller",
+        "endpoint": "system_hardware/mecazicards_for_spotify",
+        "method": "saveSpotifyCredentials"
+      },
+      "saveButton": {
+        "label": "Kaydet ve İsimleri Çek",
+        "data": ["spotify_client_id", "spotify_client_secret"]
+      },
+      "content": [
+        {
+          "id": "spotify_client_id",
+          "element": "input",
+          "type": "text",
+          "label": "Client ID (developer.spotify.com/dashboard)",
+          "value": ""
+        },
+        {
+          "id": "spotify_client_secret",
+          "element": "input",
+          "type": "password",
+          "label": "Client Secret",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": "section_refresh_names",
+      "element": "section",
+      "label": "İsimleri Yenile",
+      "icon": "fa-refresh",
+      "description": "",
+      "content": [
+        {
+          "id": "refresh_names_button",
+          "element": "button",
+          "label": "Tüm İsimleri Yeniden Çek",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "system_hardware/mecazicards_for_spotify",
+            "method": "refreshSpotifyNames"
+          }
+        }
+      ]
+    },
+    {
+      "id": "section_mapping_list",
+      "element": "section",
+      "label": "Kayıtlı Eşleştirmeler",
+      "icon": "fa-list",
+      "description": "",
+      "content": []
+    },
+    {
+      "id": "section_add_mapping",
+      "element": "section",
+      "label": "Eşleştirme Ekle / Güncelle",
+      "icon": "fa-plus",
+      "description": "Var olan bir kart ID'sini tekrar girip kaydedersen, o kartın eşleşmesi günceller (üzerine yazar). Spotify URI için 'spotify:playlist:...' veya 'spotify:artist:...' formatını kullan.",
+      "onSave": {
+        "type": "controller",
+        "endpoint": "system_hardware/mecazicards_for_spotify",
+        "method": "addOrUpdateMapping"
+      },
+      "saveButton": {
+        "label": "Kaydet",
+        "data": ["card_id", "spotify_uri"]
+      },
+      "content": [
+        {
+          "id": "card_id",
+          "element": "input",
+          "type": "text",
+          "label": "Kart ID",
+          "value": ""
+        },
+        {
+          "id": "spotify_uri",
+          "element": "input",
+          "type": "text",
+          "label": "Spotify URI",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": "section_remove_mapping",
+      "element": "section",
+      "label": "Eşleştirme Sil",
+      "icon": "fa-trash",
+      "description": "",
+      "onSave": {
+        "type": "controller",
+        "endpoint": "system_hardware/mecazicards_for_spotify",
+        "method": "removeMapping"
+      },
+      "saveButton": {
+        "label": "Sil",
+        "data": ["card_id_to_remove"]
+      },
+      "content": [
+        {
+          "id": "card_id_to_remove",
+          "element": "input",
+          "type": "text",
+          "label": "Silinecek Kart ID",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": "section_web_ui",
+      "element": "section",
+      "label": "Kart Galerisi ve Spotify Connect",
+      "icon": "fa-external-link",
+      "description": "",
+      "content": [
+        {
+          "id": "open_gallery_button",
+          "element": "button",
+          "label": "Kart Galerisini Aç",
+          "onClick": {
+            "type": "openUrl",
+            "url": ""
+          }
+        },
+        {
+          "id": "authorize_connect_button",
+          "element": "button",
+          "label": "Spotify Connect Yetkilendir (çalma için)",
+          "onClick": {
+            "type": "openUrl",
+            "url": ""
+          }
+        }
+      ]
+    }
+  ]
+}

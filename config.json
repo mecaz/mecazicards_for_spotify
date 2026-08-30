@@ -1,0 +1,62 @@
+{
+  "hid_device_path": {
+    "value": "/dev/mecazicards_hid",
+    "type": "string"
+  },
+  "input_event_device_path": {
+    "value": "/dev/mecazicards_input",
+    "type": "string"
+  },
+  "mappings": {
+    "value": "{}",
+    "type": "string"
+  },
+  "last_played_card_id": {
+    "value": "",
+    "type": "string"
+  },
+  "spotify_client_id": {
+    "value": "",
+    "type": "string"
+  },
+  "spotify_client_secret": {
+    "value": "",
+    "type": "string"
+  },
+  "resolved_names": {
+    "value": "{}",
+    "type": "string"
+  },
+  "spotify_refresh_token": {
+    "value": "",
+    "type": "string"
+  },
+  "web_ui_port": {
+    "value": 3500,
+    "type": "number"
+  },
+  "spotify_connect_device_name": {
+    "value": "",
+    "type": "string"
+  },
+  "spotify_oauth_state": {
+    "value": "",
+    "type": "string"
+  },
+  "playback_mode": {
+    "value": "auto",
+    "type": "string"
+  },
+  "play_stats": {
+    "value": "{}",
+    "type": "string"
+  },
+  "gallery_sort": {
+    "value": "score",
+    "type": "string"
+  },
+  "custom_info": {
+    "value": "{}",
+    "type": "string"
+  }
+}

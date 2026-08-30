@@ -1,0 +1,30 @@
+{
+  "name": "mecazicards_for_spotify",
+  "version": "3.13.1",
+  "description": "RFID/NFC kart okuyucu ile Volumio üzerinde Spotify playlist/sanatçı çalma",
+  "main": "index.js",
+  "author": "mecaz",
+  "license": "MIT",
+  "volumio_info": {
+    "prettyName": "mecazicards for Spotify",
+    "icon": "fa-id-card",
+    "plugin_type": "system_hardware",
+    "boot_priority": 10,
+    "architectures": [
+      "armhf",
+      "arm64",
+      "amd64",
+      "i386"
+    ],
+    "details": "RFID/NFC kart okuyucu ile Spotify playlist/sanatci calma"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "volumio": ">=3"
+  },
+  "dependencies": {
+    "fs-extra": "^8.1.0",
+    "kew": "^0.7.0",
+    "v-conf": "^1.4.3"
+  }
+}

@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mecazicards for Spotify</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --green: #1db954;
+    --green-dim: #14833b;
+    --red: #f85149;
+    --amber: #d29922;
+    --playing: #29C4A1;
+    --brand: #FFC12E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 {
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 4px;
+  }
+  h1 .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+  }
+  h1 .dot.on { background: var(--green); }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 12px;
+    color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  .stat {
+    background: var(--panel-2);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+  .stat .value { font-size: 15px; margin-top: 4px; word-break: break-all; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin: 10px 0 5px; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  input:focus { outline: none; border-color: var(--green); }
+  button {
+    background: var(--green);
+    color: #04120a;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+  }
+  button:hover { background: #22d15f; }
+  button:disabled { background: var(--green-dim); cursor: default; opacity: .6; }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 5px 10px; font-size: 12px; margin: 0; }
+  a.button-link { text-decoration: none; display: inline-block; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .msg { font-size: 13px; margin-top: 10px; padding: 8px 10px; border-radius: 8px; display: none; }
+  .msg.ok { display: block; background: rgba(29,185,84,.15); color: #4ade80; }
+  .msg.err { display: block; background: rgba(248,81,73,.15); color: #f87171; }
+  .mapping-list { max-height: 420px; overflow-y: auto; border-top: 1px solid var(--border); margin-top: 4px; }
+  .mapping-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .mapping-row .info { min-width: 0; }
+  .mapping-row .cardid { color: var(--text-dim); font-size: 11px; font-family: monospace; }
+  .mapping-row .name { font-size: 14px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mapping-row .uri { color: var(--text-dim); font-size: 11px; font-family: monospace; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .unmatched-banner {
+    background: rgba(248,81,73,.12);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .connect-banner {
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .connect-banner.warn {
+    display: flex;
+    background: rgba(210,153,34,.12);
+    border: 1px solid var(--amber);
+  }
+  .connect-banner.ok {
+    display: flex;
+    background: rgba(29,185,84,.12);
+    border: 1px solid var(--green);
+  }
+  .connect-banner .text { flex: 1; min-width: 200px; }
+  .steps { display: flex; flex-direction: column; gap: 18px; }
+  .step { display: flex; gap: 12px; align-items: flex-start; }
+  .step-no {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--green); color: #04120a; font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .step-desc { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+  .step-desc b { color: var(--text); font-weight: 600; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 5px; font-size: 12px; color: var(--text);
+  }
+  .copy-row { display: flex; gap: 8px; align-items: center; margin-top: 9px; flex-wrap: wrap; }
+  .copy-row .copy-target {
+    flex: 1; min-width: 220px; padding: 8px 10px; font-size: 12.5px;
+    overflow-x: auto; white-space: nowrap;
+  }
+  .copy-row button { margin-top: 0; flex-shrink: 0; }
+  #connectSetup input[type=text] { margin-top: 9px; }
+  .stale-warning {
+    display: none;
+    margin-top: 9px; padding: 10px 12px; border-radius: 8px;
+    background: rgba(248,81,73,.12); border: 1px solid var(--red);
+    font-size: 12.5px; color: var(--text); line-height: 1.5;
+  }
+  .stale-warning.show { display: block; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
+  .view-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .view-tabs button {
+    margin: 0; background: var(--panel-2); color: var(--text-dim);
+    border: 1px solid var(--border); padding: 7px 14px; font-weight: 500;
+  }
+  .view-tabs button.active { background: var(--green); color: #04120a; border-color: var(--green); font-weight: 700; }
+
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 16px;
+    margin-top: 4px;
+  }
+  /* Dikey (portre) ID-1 kart oranı: 54 x 85.6 mm */
+  .rfid-card {
+    position: relative;
+    aspect-ratio: 54 / 85.6;
+    border-radius: 11px;
+    overflow: hidden;
+    background: #0b0e12;
+    box-shadow: 0 4px 14px rgba(0,0,0,.45);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  /* Arkada, kapak görselinin bulanık hâli - kartın kenarlarını doldurur */
+  .rfid-card .backdrop {
+    position: absolute; inset: 0;
+    background-size: cover; background-position: center;
+    filter: blur(22px) saturate(1.4) brightness(.5);
+    transform: scale(1.25);
+  }
+  .rfid-card .veil { position: absolute; inset: 0; background: rgba(8,11,15,.55); }
+  .rfid-card > * { position: relative; }
+
+  .rfid-card .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 10px 8px; gap: 6px; flex-shrink: 0;
+  }
+  .rfid-card .card-head img.vlogo { height: 17px; width: auto; max-width: 64%; object-fit: contain; }
+  .rfid-card .card-head svg.vmark { height: 16px; width: auto; max-width: 68%; display: block; }
+  .rfid-card .card-head img.brandimg { height: 15px; width: auto; max-width: 72%; display: block; object-fit: contain; }
+  .rfid-card img.corner-logo { height: 18px; width: auto; max-width: 54%; object-fit: contain; }
+
+  /* Tıklanabilir kart + çalan kart vurgusu */
+  .rfid-card { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+  .rfid-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.55); }
+  .rfid-card:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  /* Çalan kart vurgusu AMBER. Yeşil kullanınca Spotify'ın kendi yeşiliyle
+     (alt bantta) ve yeşil kapaklı kartlarla aynı aileye düşüyor, vurgu
+     kayboluyordu. Amber hem kapaklardan hem Spotify'dan ayrışıyor. */
+  .rfid-card.playing {
+    border-color: var(--playing);
+    box-shadow: 0 0 0 2px var(--playing), 0 6px 18px rgba(41,196,161,.30);
+  }
+  .rfid-card .cover-wrap { position: relative; flex-shrink: 0; }
+  .rfid-card .playing-badge {
+    position: absolute; left: 12px; bottom: 6px;
+    background: var(--playing); color: #04120a;
+    font-size: 8.5px; font-weight: 800; letter-spacing: .03em;
+    padding: 2px 6px; border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.45);
+  }
+  .rfid-card .dots {
+    position: absolute; right: 12px; top: 4px; margin: 0;
+    width: 20px; height: 20px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8,11,15,.72); color: #fff;
+    border: 1px solid rgba(255,255,255,.18); border-radius: 6px;
+    font-size: 13px; line-height: 1; font-weight: 700;
+    opacity: 0; transition: opacity .12s ease;
+  }
+  .rfid-card:hover .dots, .rfid-card:focus-within .dots { opacity: 1; }
+  .rfid-card .dots:hover { background: rgba(8,11,15,.95); }
+  /* Dokunmatik cihazlarda hover yok - düğme hep görünsün */
+  @media (hover: none) { .rfid-card .dots { opacity: .85; } }
+  .rfid-card .card-head .vlogo-fallback { display: flex; align-items: center; gap: 4px; }
+  .rfid-card .card-head .vlogo-fallback span {
+    font-size: 9.5px; font-weight: 700; letter-spacing: .06em; color: #51B289;
+  }
+
+  /* Kapak görseli: kare alan + cover => Spotify görselleri kare olduğu için
+     hiç kırpılmadan tamamı görünür. */
+  .rfid-card .cover {
+    margin: 0 8px;
+    aspect-ratio: 1 / 1;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #11161c;
+    background-size: cover; background-position: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  }
+  .rfid-card .cover.empty {
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1c2128, #2b3038);
+  }
+  .rfid-card .cover.empty .no-art { font-size: 9px; color: var(--text-dim); text-align: center; padding: 0 6px; }
+
+  .rfid-card .card-body {
+    flex: 1; min-height: 0;
+    padding: 8px 10px 0;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .rfid-card .title {
+    font-weight: 700; font-size: 12.5px; line-height: 1.3; color: #fff;
+    flex-shrink: 0;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+    /* İsmi çekilememiş kartlarda ham URI gösteriliyor; boşluksuz olduğu için
+       satır sonunda kırılmazsa karttan taşıyor. */
+    overflow-wrap: anywhere; word-break: break-word;
+  }
+  /* Playlist/albüm kapaklarında ismin kendisi zaten görselin üstünde basılı
+     geliyor - o yüzden başlığı burada ikincil bir bilgi gibi gösteriyoruz.
+     Sanatçı kapaklarında isim yazmadığı için orada başlık belirgin kalıyor. */
+  .rfid-card .title.secondary {
+    font-weight: 500; font-size: 11px; color: var(--text-dim);
+    -webkit-line-clamp: 3; text-shadow: none; flex-shrink: 0;
+  }
+  .rfid-card .meta {
+    margin-top: auto; padding-top: 4px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 5px;
+  }
+  .rfid-card .cardid-tag {
+    font-family: ui-monospace, monospace; font-size: 8.5px; color: rgba(255,255,255,.7);
+    letter-spacing: .02em; flex-shrink: 0;
+  }
+
+  /* Alt köşeler: solda Raspberry Pi, sağda Spotify */
+  .rfid-card .card-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 10px 10px; flex-shrink: 0;
+    border-top: 1px solid rgba(255,255,255,.10);
+    margin-top: 5px;
+  }
+  .gallery-empty { color: var(--text-dim); font-size: 13px; padding: 16px 0; }
+
+  .stat.wide { grid-column: span 2; }
+  .stat .sub {
+    font-size: 12px; color: var(--text-dim); margin-top: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  select {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 10px; border-radius: 8px; font-size: 13.5px;
+  }
+  select:focus { outline: none; border-color: var(--green); }
+  .hint { font-size: 12px; color: var(--text-dim); margin-top: 9px; line-height: 1.5; }
+  .hint b { color: var(--text); font-weight: 600; }
+  button.danger-solid {
+    background: transparent; color: var(--red); border: 1px solid var(--red);
+  }
+  button.danger-solid:hover { background: rgba(248,81,73,.14); }
+
+  /* Kart detay penceresi */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(4,7,10,.72);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; width: 100%; max-width: 420px;
+    padding: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.6);
+  }
+  .modal-head { display: flex; gap: 13px; align-items: center; }
+  .modal-cover {
+    width: 66px; height: 66px; border-radius: 8px; flex-shrink: 0;
+    background: var(--panel-2) center/cover no-repeat;
+    border: 1px solid var(--border);
+  }
+  .modal-head-text { min-width: 0; }
+  .modal-title { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+  .modal-kind {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-dim); margin-top: 4px;
+  }
+  .modal-rows { margin: 16px 0 4px; }
+  .modal-row {
+    display: flex; justify-content: space-between; gap: 12px; align-items: center;
+    padding: 8px 0; border-top: 1px solid var(--border); font-size: 12.5px;
+  }
+  .modal-row span { color: var(--text-dim); flex-shrink: 0; }
+  .modal-row code { overflow-wrap: anywhere; text-align: right; }
+  .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .modal-actions button { flex: 1; min-width: 110px; }
+
+  /* ---------- Baskı sekmesi (ekran tarafı) ---------- */
+  .print-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; flex-wrap: wrap;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 11px 13px; margin-bottom: 4px;
+  }
+  .print-info { font-size: 13px; }
+  .print-info b { color: var(--green); font-size: 15px; }
+  .print-hint { display: block; color: var(--text-dim); font-size: 11.5px; margin-top: 2px; }
+  .print-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .print-controls button { margin-top: 0; }
+  .inline-check {
+    display: flex; align-items: center; gap: 6px; margin: 0;
+    font-size: 12.5px; color: var(--text); cursor: pointer;
+  }
+  .inline-check input { accent-color: var(--green); width: 15px; height: 15px; }
+
+  /* Seçim kipinde kartın köşesindeki onay kutusu */
+  .rfid-card .pick {
+    position: absolute; left: 8px; top: 8px; z-index: 3;
+    width: 20px; height: 20px; margin: 0;
+    accent-color: var(--green); cursor: pointer;
+  }
+  .rfid-card.selectable { }
+  .rfid-card.selectable .dots { display: none; }
+  .rfid-card.picked { border-color: var(--green); box-shadow: 0 0 0 2px var(--green); }
+  .rfid-card.selectable.unpicked { opacity: .45; }
+
+  #printRoot { display: none; }
+
+  /* ---------- Baskı çıktısı ---------- */
+  @media print {
+    /* Ekran arayüzünü tamamen gizle, sadece baskı sayfalarını bas. */
+    body > .wrap, body > .modal-backdrop { display: none !important; }
+    body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
+    #printRoot { display: block !important; }
+
+    @page { size: A4 portrait; margin: 0; }
+
+    .sheet {
+      width: 210mm; height: 297mm;
+      background: #fff;
+      position: relative;
+      page-break-after: always;
+      break-after: page;
+      /* Kart zeminleri ve kapak görselleri basılsın diye renk düzeltmesi
+         kapatılıyor; aradaki boşluklar beyaz kaldığı için mürekkep israfı yok. */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sheet:last-child { page-break-after: auto; break-after: auto; }
+
+    .sheet-grid {
+      position: absolute;
+      top: 10mm; left: 16mm;
+      display: grid;
+      grid-template-columns: repeat(3, 54mm);
+      grid-template-rows: repeat(3, 85.6mm);
+      column-gap: 8mm;
+      row-gap: 6mm;
+    }
+    .cell { position: relative; width: 54mm; height: 85.6mm; }
+
+    /* Köşe kesme işaretleri - kartın dışına taşan ince L'ler */
+    .cell .crop {
+      position: absolute; width: 3mm; height: 3mm;
+      border-color: #333; border-style: solid; border-width: 0;
+    }
+    .cell .crop.tl { top: -1.6mm; left: -1.6mm; border-top-width: .25mm; border-left-width: .25mm; }
+    .cell .crop.tr { top: -1.6mm; right: -1.6mm; border-top-width: .25mm; border-right-width: .25mm; }
+    .cell .crop.bl { bottom: -1.6mm; left: -1.6mm; border-bottom-width: .25mm; border-left-width: .25mm; }
+    .cell .crop.br { bottom: -1.6mm; right: -1.6mm; border-bottom-width: .25mm; border-right-width: .25mm; }
+
+    /* Baskıdaki kart, ekrandaki kartla aynı bileşen - sadece boyutu mm cinsinden */
+    .cell .rfid-card {
+      width: 54mm; height: 85.6mm; aspect-ratio: auto;
+      border-radius: 3mm; box-shadow: none; transform: none;
+      border: .2mm solid rgba(0,0,0,.25);
+      cursor: default;
+    }
+    .cell .rfid-card .dots, .cell .rfid-card .pick, .cell .rfid-card .playing-badge,
+    .cell .rfid-card .plays { display: none !important; }
+
+    .sheet-foot {
+      position: absolute; left: 0; right: 0; bottom: 6mm;
+      text-align: right; padding-right: 16mm;
+      font-style: italic; font-size: 8.5pt; color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Mürekkep tasarrufu seçeneği: kart zemini beyaz, yazılar koyu. */
+    .sheet.light .rfid-card { background: #fff; border-color: #bbb; }
+    .sheet.light .rfid-card .backdrop, .sheet.light .rfid-card .veil { display: none; }
+    .sheet.light .rfid-card .title { color: #111; text-shadow: none; }
+    .sheet.light .rfid-card .title.secondary { color: #666; }
+    .sheet.light .rfid-card .kind { color: #777; }
+    .sheet.light .rfid-card .card-foot { border-top-color: #ddd; }
+    .sheet.light .rfid-card .card-head svg.vmark g:first-child { stroke: #444; }
+    .sheet.light .rfid-card .cover.empty { background: #eee; }
+    /* Açık zemin baskısında marka turkuazının beyaz üzerindeki kontrastı
+       2.2:1'e düşüyor (okunaklılık eşiği 4.5:1). Aynı tonu koyultarak
+       ~4.6:1'e çıkarıyoruz; koyu kartlarda orijinal renk aynen kalıyor. */
+    .sheet.light .rfid-card img.brandimg { filter: brightness(.55) saturate(1.3); }
+    .sheet.light .rfid-card svg.brandmark path { fill: #16856C; }
+    .sheet.light .rfid-card .cover.empty .no-art { color: #999; }
+    .sheet.light svg circle[fill="rgba(255,255,255,.85)"] { fill: #444; }
+    .sheet.light svg g[stroke="rgba(255,255,255,.85)"] { stroke: #444; }
+  }
+  .gallery-note {
+    grid-column: 1 / -1;
+    font-size: 12px; color: var(--text-dim);
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 11px; line-height: 1.5;
+  }
+
+  /* Karta elle isim / görsel */
+  .custom-box {
+    margin: 14px 0 0; padding: 12px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .custom-head {
+    font-size: 12.5px; font-weight: 600; color: var(--text);
+    margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .custom-note {
+    font-size: 11px; font-weight: 500; color: var(--amber);
+    border: 1px solid var(--amber); border-radius: 999px; padding: 1px 7px;
+  }
+  .custom-box label {
+    display: block; font-size: 11.5px; color: var(--text-dim); margin: 8px 0 4px;
+  }
+  .custom-box input[type="text"] {
+    width: 100%; background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 7px 9px; font-size: 13px; font-family: inherit;
+  }
+  .custom-box input[type="file"] {
+    display: block; width: 100%; font-size: 12px; color: var(--text-dim);
+  }
+  .custom-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+  /* Yedekle / geri yükle */
+  .restore-box {
+    margin-top: 14px; padding: 12px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .restore-box input[type="file"] {
+    display: block; width: 100%; margin: 6px 0 10px;
+    font-size: 12.5px; color: var(--text-dim);
+  }
+  .restore-modes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .restore-modes .inline-check { font-size: 12.5px; color: var(--text-dim); }
+  .restore-modes b { color: var(--text); }
+
+  /* Sıralama çubuğu - sadece galeri görünümünde */
+  .sort-bar {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 14px; flex-wrap: wrap;
+  }
+  .sort-bar label { font-size: 12px; color: var(--text-dim); }
+  .sort-bar select {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 6px 9px; font-size: 13px; font-family: inherit;
+  }
+  .sort-hint { font-size: 11.5px; color: var(--text-dim); }
+
+  /* Çalma sayısı rozeti - EKRANDA, baskıda değil.
+     Basılan kart temiz kalmalı: fiziksel kartın üstünde "42x" yazması
+     bir süre sonra yanlış bilgi olurdu, kartı yeniden basmadan güncellenemez. */
+  /* Sağ alt köşe: "çalıyor" rozeti sol altta, ⋮ düğmesi sağ ÜSTTE.
+     Üçü de birbirine değmiyor. */
+  .rfid-card .plays {
+    position: absolute; right: 12px; bottom: 6px; z-index: 4;
+    font-size: 9.5px; font-weight: 600; letter-spacing: .02em;
+    color: rgba(255,255,255,.62);
+    background: rgba(0,0,0,.42);
+    border-radius: 999px; padding: 2px 6px;
+    backdrop-filter: blur(3px);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="dot" id="connDot"></span>mecazicards for Spotify</h1>
+  <div class="subtitle">Volumio eklentisi · Kart galerisi ve eşleştirme yönetimi<span id="codeVersion"></span></div>
+
+  <div class="connect-banner ok" id="connectBannerOk">
+    <div class="text">Spotify Connect yetkilendirmesi aktif ✓ — kartlar Spotify Connect üzerinden çalıyor.</div>
+    <button type="button" class="secondary" id="btnReauthorize">Yeniden Yetkilendir</button>
+  </div>
+
+  <div class="unmatched-banner" id="unmatchedBanner"></div>
+
+  <div class="card" id="connectSetup">
+    <h2>Spotify Connect Yetkilendirme <span class="badge" id="connectBadge">gerekli</span></h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-no">1</div>
+        <div class="step-body">
+          <div class="step-title">Bu adresi Spotify Developer Dashboard'a ekle</div>
+          <div class="step-desc">
+            Uygulamanın ayarlarında <b>Redirect URIs</b> kısmına aşağıdaki adresi <b>birebir</b> ekleyip kaydet.
+            Spotify artık düz <code>http://</code> adresleri sadece <code>127.0.0.1</code> için kabul ediyor —
+            bu yüzden buraya cihazın LAN IP'sini (192.168.x.x) veya <code>localhost</code> yazarsan kabul edilmez.
+          </div>
+          <div class="copy-row">
+            <code class="copy-target" id="redirectUri">yükleniyor…</code>
+            <button type="button" class="secondary" id="btnCopyRedirect">Kopyala</button>
+          </div>
+          <div class="stale-warning" id="staleWarning">
+            <b>Eklentinin eski kod sürümü çalışıyor.</b> Web arayüzü güncellendi ama eklentinin JavaScript kodu
+            Volumio tarafından hâlâ önbellekten eski hâliyle çalıştırılıyor, bu yüzden yönlendirme adresi alınamıyor.
+            SSH'tan <code>sudo systemctl restart volumio</code> çalıştırıp (ya da cihazı yeniden başlatıp)
+            bu sayfayı sert yenile (Ctrl+Shift+R).
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-no">2</div>
+        <div class="step-body">
+          <div class="step-title">Spotify'da izin ver</div>
+          <div class="step-desc">Aşağıdaki butona bas, Spotify hesabınla giriş yapıp izin ver.</div>
+          <a class="button-link" href="/spotify-connect/authorize"><button type="button">Spotify'da Yetkilendir</button></a>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-no">3</div>
+        <div class="step-body">
+          <div class="step-title">Açılan adresi buraya yapıştır</div>
+          <div class="step-desc">
+            İzin verdikten sonra tarayıcı <code>127.0.0.1</code> adresine gitmeye çalışacak ve
+            <b>"bağlantı reddedildi" / "sayfa açılamıyor"</b> hatası verecek — <b>bu normal</b>, çünkü o adres senin
+            kendi cihazını değil Raspberry Pi'yi göstermesi gerekiyor. O sayfanın <b>adres çubuğundaki adresin tamamını</b>
+            kopyalayıp buraya yapıştır:
+          </div>
+          <input type="text" id="manualRedirect" placeholder="http://127.0.0.1:3500/spotify-connect/callback?code=AQD...&amp;state=...">
+          <button type="button" id="btnManualSubmit">Yetkilendirmeyi Tamamla</button>
+          <div class="msg" id="msgConnect"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Durum</h2>
+    <div class="stat-grid">
+      <div class="stat wide">
+        <div class="label">Son okunan kart</div>
+        <div class="value" id="stLastCard">-</div>
+        <div class="sub" id="stLastCardName"></div>
+      </div>
+      <div class="stat wide">
+        <div class="label">Şu an çalan</div>
+        <div class="value" id="stNowPlaying">-</div>
+        <div class="sub" id="stNowPlayingSub"></div>
+      </div>
+      <div class="stat"><div class="label">triggerhappy engelleyici</div><div class="value" id="stGrab">-</div></div>
+      <div class="stat"><div class="label">Eşleştirme / İsim çekilmiş</div><div class="value" id="stCount">-</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="playbackCard">
+    <h2>Çalma Yöntemi ve Hedef Cihaz</h2>
+    <label>Kart okutulunca müzik nasıl başlatılsın?</label>
+    <select id="playbackMode">
+      <option value="auto">Otomatik — önce Spotify Connect, olmazsa Volumio'nun kendi yöntemi (önerilen)</option>
+      <option value="connect">Sadece Spotify Connect</option>
+      <option value="local">Sadece Volumio'nun kendi yöntemi (yerel)</option>
+    </select>
+
+    <label>Spotify Connect hedef cihazı <span class="badge" id="deviceBadge">otomatik</span></label>
+    <div class="row">
+      <select id="connectDevice" style="flex:1;min-width:180px;">
+        <option value="">(otomatik seç)</option>
+      </select>
+      <button class="secondary" type="button" id="btnLoadDevices">Cihazları Tara</button>
+    </div>
+    <div class="hint">
+      Hedefi sabitlersen kart okutunca komutlar <b>hep bu cihaza</b> gider — Mac'inde ya da TV'nde
+      müzik çalıyor olsa bile oradaki çalma bozulmaz, müzik bu cihaza taşınır. Sabitlemezsen Spotify
+      o an aktif olan cihazı hedef alabilir.
+    </div>
+    <button id="btnSavePlayback">Kaydet</button>
+    <div class="msg" id="msgPlayback"></div>
+  </div>
+
+  <div class="card">
+    <h2>Spotify API Kimlik Bilgileri <span class="badge">isim gösterimi + Connect yetkilendirmesi için</span></h2>
+    <label>Client ID</label>
+    <input type="text" id="spClientId" placeholder="developer.spotify.com/dashboard">
+    <label>Client Secret</label>
+    <input type="password" id="spClientSecret" placeholder="••••••••">
+    <div class="row">
+      <button id="btnSaveSpotify">Kaydet ve İsimleri Çek</button>
+      <button class="secondary" id="btnRefreshNames">Tüm İsimleri Yenile</button>
+    </div>
+    <div class="msg" id="msgSpotify"></div>
+  </div>
+
+  <div class="card">
+    <h2>Eşleştirme Ekle / Güncelle</h2>
+    <label>Kart ID</label>
+    <input type="text" id="mapCardId" placeholder="örn. 0002775654">
+    <label>Spotify URI</label>
+    <input type="text" id="mapUri" placeholder="spotify:playlist:... veya spotify:artist:...">
+    <button id="btnSaveMapping">Kaydet</button>
+    <div class="msg" id="msgMapping"></div>
+  </div>
+
+  <div class="card">
+    <h2>Yedekle / Geri Yükle <span class="badge" id="backupBadge">— kart</span></h2>
+    <div class="hint" style="margin-bottom:12px;">
+      Kart eşleştirmeleri bu sistemin yerine konamaz tek parçası — kod yeniden yazılır,
+      148 kartı tek tek yeniden okutmak saatler alır. Hepsi SD kartta duruyor ve
+      Raspberry Pi'lerde en sık görülen arıza SD kartın ölmesi.
+      <b>Güvenlik gereği kimlik bilgileri (client secret, refresh token) yedeğe dâhil edilmez.</b>
+    </div>
+
+    <div class="row">
+      <button type="button" id="btnBackup">Yedeği İndir</button>
+      <span class="sort-hint">Eşleştirmeler + isimler + çalma istatistiği</span>
+    </div>
+
+    <div class="restore-box">
+      <label>Geri yükle</label>
+      <input type="file" id="restoreFile" accept="application/json,.json">
+      <div class="restore-modes">
+        <label class="inline-check">
+          <input type="radio" name="restoreMode" value="merge" checked>
+          <b>Birleştir</b> — yedektekiler eklenir/güncellenir, diğer kartların kalır
+        </label>
+        <label class="inline-check">
+          <input type="radio" name="restoreMode" value="replace">
+          <b>Değiştir</b> — eşleştirmeler birebir yedektekiler olur
+        </label>
+      </div>
+      <button type="button" class="secondary" id="btnRestore" disabled>Geri Yükle</button>
+      <div class="hint" style="margin-top:8px;">
+        Geri yüklemeden hemen önce mevcut durumun otomatik olarak diske yazılır,
+        böylece yanlış bir geri yükleme geri alınabilir.
+      </div>
+    </div>
+
+    <div class="msg" id="msgBackup"></div>
+  </div>
+
+  <div class="card">
+    <h2>Kayıtlı Eşleştirmeler</h2>
+    <div class="view-tabs">
+      <button id="tabList" class="active" onclick="setView('list')">Liste</button>
+      <button id="tabGallery" onclick="setView('gallery')">Kart Galerisi</button>
+      <button id="tabPrint" onclick="setView('print')">Baskı</button>
+    </div>
+
+    <div id="printToolbar" style="display:none;">
+      <div class="print-bar">
+        <div class="print-info">
+          <b id="printCount">0</b> kart seçili · <span id="printPages">0</span> sayfa
+          <span class="print-hint">A4'e 3 × 3 = sayfa başına 9 kart</span>
+        </div>
+        <div class="print-controls">
+          <button type="button" class="secondary" id="btnSelectAll">Tümünü Seç</button>
+          <button type="button" class="secondary" id="btnSelectNone">Seçimi Temizle</button>
+          <label class="inline-check">
+            <input type="checkbox" id="printLight"> Açık zemin (mürekkep tasarrufu)
+          </label>
+          <button type="button" id="btnPrint">PDF Olarak Kaydet / Yazdır</button>
+        </div>
+      </div>
+      <div class="hint">
+        Düğmeye basınca tarayıcının yazdırma penceresi açılır; hedef olarak
+        <b>"PDF olarak kaydet"</b> seçersen A4 boyutunda, kesme işaretli bir dosya elde edersin.
+        Kartların arası beyaz bırakıldı. Yazdırma ayarlarında <b>ölçek %100</b> ve
+        <b>kenar boşlukları "yok"</b> olmalı ki kartlar gerçek kart boyutunda (54 × 85.6 mm) çıksın.
+      </div>
+    </div>
+
+    <input class="search" id="search" placeholder="Kart ID veya isimde ara...">
+
+    <div class="sort-bar" id="sortBar" style="display:none;">
+      <label for="gallerySort">Sıralama</label>
+      <select id="gallerySort">
+        <option value="score">Son zamanlarda en çok çalınan</option>
+        <option value="last">En son çalınan</option>
+        <option value="name">İsme göre (A–Z)</option>
+        <option value="card">Kart numarası</option>
+      </select>
+      <span class="sort-hint" id="sortHint"></span>
+    </div>
+
+    <div class="mapping-list" id="mappingList"></div>
+    <div class="gallery-grid" id="mappingGallery" style="display:none;"></div>
+  </div>
+</div>
+
+<div id="printRoot" aria-hidden="true"></div>
+
+<div class="modal-backdrop" id="cardModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-cover" id="modalCover"></div>
+      <div class="modal-head-text">
+        <div class="modal-title" id="modalTitle">-</div>
+        <div class="modal-kind" id="modalKind"></div>
+      </div>
+    </div>
+    <div class="modal-rows">
+      <div class="modal-row"><span>Kart numarası</span><code id="modalCardId">-</code></div>
+      <div class="modal-row"><span>Spotify URI</span><code id="modalUri">-</code></div>
+    </div>
+
+    <div class="custom-box">
+      <div class="custom-head">
+        Kartın görünüşü
+        <span class="custom-note" id="customNote"></span>
+      </div>
+      <label for="customName">İsim</label>
+      <input type="text" id="customName" placeholder="Spotify'dan gelen ismi kullan" maxlength="200">
+      <label for="customImage">Kapak görseli</label>
+      <input type="file" id="customImage" accept="image/*">
+      <div class="custom-actions">
+        <button type="button" id="btnCustomSave">Kaydet</button>
+        <button type="button" class="secondary" id="btnCustomReset">Sıfırla</button>
+      </div>
+      <div class="hint" style="margin-top:8px;">
+        Spotify'ın kişisel listeleri (daylist, Daily Mix, Blend) ve emekliye ayırdığı
+        listeler dışarıya kapalı — isim ve kapağı buradan sen verirsin.
+        Görsel 800×800'e küçültülüp cihaza kaydedilir, güncellemelerde silinmez.
+      </div>
+      <div class="msg" id="msgCustom"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" id="btnModalEdit">Eşleştirmeyi Değiştir</button>
+      <button type="button" class="danger-solid" id="btnModalDelete">Sil</button>
+      <button type="button" class="secondary" id="btnModalClose">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentState = null;
+let currentView = 'list';
+let connectSetupPinned = false;
+// Galeri sıralaması. Sunucudan geliyor (cihazda saklı), böylece telefonla
+// masaüstü aynı sırayı görüyor. Sunucu cevabı gelene kadar varsayılan.
+let currentSort = 'score';
+// Kullanıcı bu oturumda sıralamayı bir kez seçtiyse, sunucudan gelen değer
+// artık ONU EZMEZ. Sayfa 4 saniyede bir yoklanıyor ve bir /api/state isteği,
+// sıralamayı kaydeden POST'tan ÖNCE yola çıkıp SONRA dönebiliyor - o yanıt eski
+// değeri taşıdığı için seçim bir saniye sonra kendiliğinden geri sıçrıyordu.
+// Bayrağı POST bitince sıfırlamak bu yarışı kapatmıyordu; kalıcı yapmak kapatıyor.
+// Sunucu değeri artık yalnızca ilk yüklemede kullanılıyor.
+let sortUserChosen = false;
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const RASPBERRY_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+  <g fill="#C7295D">
+    <circle cx="12" cy="7.4" r="2.5"/>
+    <circle cx="8.4" cy="9.9" r="2.5"/>
+    <circle cx="15.6" cy="9.9" r="2.5"/>
+    <circle cx="12" cy="12.5" r="2.5"/>
+    <circle cx="9.3" cy="15" r="2.1"/>
+    <circle cx="14.7" cy="15" r="2.1"/>
+    <circle cx="12" cy="17.3" r="2.1"/>
+  </g>
+  <path d="M12 4.9 C 12.9 2.7, 15.6 2.6, 16.1 4.9" stroke="#3AA757" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M12 4.9 C 11.1 2.7, 8.4 2.6, 7.9 4.9" stroke="#3AA757" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>`;
+
+const SPOTIFY_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+  <circle cx="12" cy="12" r="10.5" fill="#1DB954"/>
+  <path d="M6.2 9.3 C10 7.6, 14 7.6, 17.8 9.3" stroke="#04120a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M6.7 12.3 C10.3 10.7, 13.7 10.7, 17.3 12.3" stroke="#04120a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M7.3 15.2 C10.3 14, 13.7 14, 16.7 15.2" stroke="#04120a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>`;
+
+// Temassız kart (RFID/NFC) evrensel sembolü - dört yay.
+const RFID_SVG = `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
+  <circle cx="6.2" cy="12" r="1.35" fill="rgba(255,255,255,.85)"/>
+  <g fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.75" stroke-linecap="round">
+    <path d="M9.6 8.5 A 4.5 4.5 0 0 1 9.6 15.5"/>
+    <path d="M13.1 6.5 A 7 7 0 0 1 13.1 17.5"/>
+    <path d="M16.6 4.5 A 9.5 9.5 0 0 1 16.6 19.5"/>
+  </g>
+</svg>`;
+
+// Volumio kelime logosu — orijinaline birebir yakın olacak şekilde çizildi:
+// ince, yuvarlak uçlu geometrik harfler; iki "o" harfi, içinde yeşil ibre olan
+// birer ses düğmesi (ve ibreler farklı açılarda, orijinalinde olduğu gibi).
+// Orijinali koyu gri (#444); kart zemini koyu olduğu için harfleri açık griye
+// çeviriyoruz, yeşil vurgu aynen korunuyor.
+const VOLUMIO_WORDMARK_SVG = `<svg viewBox="0 0 172 40" class="vmark" aria-label="volumio">
+  <g fill="none" stroke="#e3e7ea" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 12 L17 34 L28 12"/>
+    <circle cx="41" cy="23" r="11"/>
+    <path d="M58 4 V34"/>
+    <path d="M70 12 V25 A9 9 0 0 0 88 25 V12"/>
+    <path d="M100 34 V19 A7.5 7.5 0 0 1 115 19 V34 M115 19 A7.5 7.5 0 0 1 130 19 V34"/>
+    <path d="M140 12 V34"/>
+    <circle cx="155" cy="23" r="11"/>
+  </g>
+  <g fill="none" stroke="#4DBD97" stroke-width="3.6" stroke-linecap="round">
+    <path d="M37.6 14.6 L41.6 22.4"/>
+    <path d="M155.4 23.4 L159.8 31"/>
+  </g>
+</svg>`;
+
+// Bir logo için: eklentinin "web" klasöründe kendi dosyan varsa (ya da Volumio
+// logosu cihazda bulunduysa) onu <img> olarak göster; yoksa yerleşik SVG çizimi
+// kullan. Dosya bozuksa/yüklenemezse yine çizime düşer.
+// Varlık adresine çalışan kod sürümünü ekler. Dosya adı hep aynı olduğu için
+// (brand-logo, spotify-logo...) tarayıcı eskisini önbellekten veriyordu;
+// sürüm değişince adres de değişiyor ve önbellek kendiliğinden aşılıyor.
+function assetUrl(name) {
+  const v = (currentState && currentState.codeVersion) || '0';
+  return '/assets/' + name + '?v=' + encodeURIComponent(v);
+}
+
+function assetMarkup(key, cssClass, alt, fallbackGlobalName) {
+  const available = currentState && currentState.assets && currentState.assets[key];
+  if (available) {
+    return '<img class="' + cssClass + '" src="' + assetUrl(key + '-logo') + '" alt="' + alt + '" ' +
+      'onerror="this.outerHTML=window.' + fallbackGlobalName + '">';
+  }
+  return window[fallbackGlobalName];
+}
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('tabList').classList.toggle('active', view === 'list');
+  document.getElementById('tabGallery').classList.toggle('active', view === 'gallery');
+  document.getElementById('tabPrint').classList.toggle('active', view === 'print');
+  document.getElementById('mappingList').style.display = view === 'list' ? 'block' : 'none';
+  document.getElementById('mappingGallery').style.display =
+    (view === 'gallery' || view === 'print') ? 'grid' : 'none';
+  document.getElementById('printToolbar').style.display = view === 'print' ? 'block' : 'none';
+  // Sıralama çubuğu sadece galeride: liste görünümünün kendi düzeni var,
+  // baskı görünümü ise bilerek kart numarasına sabit.
+  document.getElementById('sortBar').style.display = view === 'gallery' ? 'flex' : 'none';
+  if (currentState) renderMappingList(document.getElementById('search').value);
+}
+
+// -------------------- Baskı seçimi --------------------
+const CARDS_PER_SHEET = 9;
+const selectedForPrint = new Set();
+
+function updatePrintBar() {
+  const n = selectedForPrint.size;
+  document.getElementById('printCount').textContent = n;
+  document.getElementById('printPages').textContent = Math.ceil(n / CARDS_PER_SHEET);
+  document.getElementById('btnPrint').disabled = n === 0;
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+// Baskı sayfalarını kur: her A4'e 3x3 = 9 kart, köşelerinde kesme işaretleri,
+// altında imza. Kartın kendisi ekrandakiyle birebir aynı bileşen.
+function buildPrintSheets() {
+  const root = document.getElementById('printRoot');
+  const all = currentState.mappings || [];
+  const chosen = all.filter((m) => selectedForPrint.has(m.cardId));
+  const light = document.getElementById('printLight').checked;
+
+  root.innerHTML = chunk(chosen, CARDS_PER_SHEET).map((page) => `
+    <div class="sheet${light ? ' light' : ''}">
+      <div class="sheet-grid">
+        ${page.map((m) => `
+          <div class="cell">
+            <span class="crop tl"></span><span class="crop tr"></span>
+            <span class="crop bl"></span><span class="crop br"></span>
+            ${cardMarkup(m, { forPrint: true })}
+          </div>`).join('')}
+      </div>
+      <div class="sheet-foot">© designed by mecaz</div>
+    </div>
+  `).join('');
+}
+
+window.VOLUMIO_FALLBACK_MARKUP = VOLUMIO_WORDMARK_SVG;
+window.RASPBERRY_FALLBACK_MARKUP = RASPBERRY_SVG;
+window.SPOTIFY_FALLBACK_MARKUP = SPOTIFY_SVG;
+
+const KIND_LABEL = { playlist: 'Çalma listesi', artist: 'Sanatçı', album: 'Albüm', track: 'Parça' };
+
+function uriKind(uri) {
+  const parts = String(uri).split(':');
+  return parts.length >= 2 ? parts[1] : '';
+}
+
+function findMapping(cardId) {
+  return (currentState && currentState.mappings || []).find((m) => m.cardId === cardId) || null;
+}
+
+// Kart numarasından okunabilir bir açıklama üret: "Türkçe Rock (çalma listesi)"
+function describeCard(cardId) {
+  const m = findMapping(cardId);
+  if (!m) return 'eşleştirme yok';
+  const kind = KIND_LABEL[uriKind(m.uri)];
+  return (m.name || m.uri) + (kind ? ' · ' + kind.toLowerCase() : '');
+}
+
+function renderGallery(items) {
+  const galEl = document.getElementById('mappingGallery');
+  if (items.length === 0) {
+    galEl.innerHTML = '<div class="gallery-empty">Eşleştirme yok.</div>';
+    return;
+  }
+
+  const missingArt = items.filter((m) => !m.image).length;
+
+  const note = missingArt
+    ? `<div class="gallery-note">${missingArt} kartın kapak görseli yok.
+       Genelde sebebi o ismin/görselin henüz çekilmemiş olmasıdır — yukarıdaki
+       <b>"Tüm İsimleri Yenile"</b> düğmesine basmayı dene.</div>`
+    : '';
+
+  // Baskı görünümünde sıralamaya dokunmuyoruz: orada kart numarası sırası
+  // geçerli, çünkü ekranda seçtiğin sırayla bastığın sıra aynı olmalı.
+  const shown = (currentView === 'print') ? items : sortItems(items, currentSort);
+
+  galEl.innerHTML = note + shown.map((m) => cardMarkup(m, {
+    selectable: currentView === 'print'
+  })).join('');
+  if (currentView === 'print') updatePrintBar();
+}
+
+// -------------------- Sıralama --------------------
+// Sunucu listeyi HER ZAMAN kart numarası sırasında gönderiyor; sıralamayı
+// burada yapıyoruz. Baskı sayfası ise sunucudan geleni olduğu gibi kullanıyor,
+// yani baskı sırası bu seçimden ETKİLENMİYOR - aynı sayfayı yeniden bastığında
+// hep aynı 9 kart gelsin diye.
+//
+// Her ölçütte eşitlik bozucu kart numarası: aynı puana/tarihe sahip kartlar
+// her yenilemede yer değiştirmesin, sıra kararlı olsun.
+const TR = (function () {
+  try { return new Intl.Collator('tr', { sensitivity: 'base', numeric: true }); }
+  catch (e) { return null; }
+})();
+
+function cmpName(a, b) {
+  const an = (a.name || a.uri || '').trim();
+  const bn = (b.name || b.uri || '').trim();
+  // İsmi olmayan kartlar sona - boş başlıklar listenin başını işgal etmesin.
+  if (!an && bn) return 1;
+  if (an && !bn) return -1;
+  if (TR) return TR.compare(an, bn);
+  return an.localeCompare(bn, 'tr');
+}
+
+function sortItems(items, mode) {
+  const byCard = (a, b) => (a.cardId < b.cardId ? -1 : a.cardId > b.cardId ? 1 : 0);
+  const list = items.slice();
+  if (mode === 'card') return list.sort(byCard);
+  if (mode === 'name') return list.sort((a, b) => cmpName(a, b) || byCard(a, b));
+  if (mode === 'last') {
+    return list.sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || byCard(a, b));
+  }
+  // 'score' - eriyen puan. Hiç çalınmamışlar (puan 0) kendi aralarında kart
+  // numarasına düşüyor, yani liste asla rastgele görünmüyor.
+  return list.sort((a, b) => (b.score || 0) - (a.score || 0) || byCard(a, b));
+}
+
+function relTime(ms) {
+  if (!ms) return null;
+  const d = Date.now() - ms;
+  if (d < 0) return 'az önce';
+  const dk = Math.floor(d / 60000);
+  if (dk < 1) return 'az önce';
+  if (dk < 60) return dk + ' dk önce';
+  const sa = Math.floor(dk / 60);
+  if (sa < 24) return sa + ' saat önce';
+  const gn = Math.floor(sa / 24);
+  if (gn === 1) return 'dün';
+  if (gn < 30) return gn + ' gün önce';
+  const ay = Math.floor(gn / 30);
+  return ay + ' ay önce';
+}
+
+function playsTitle(m) {
+  const rel = relTime(m.lastPlayed);
+  return m.playCount + ' kez çalındı' + (rel ? ' · son: ' + rel : '');
+}
+
+const SORT_HINTS = {
+  score: 'Her çalma +1 puan, puanlar 30 günde yarılanıyor — favoriler üstte kalır, bıraktıkların süzülüp iner.',
+  last:  'En son okuttuğun kart en üstte.',
+  name:  'Türkçe alfabeye göre; Ç/Ğ/İ/Ö/Ş/Ü doğru yerde.',
+  card:  'Kartların seri numarası. Sabit sıra — baskı sayfasıyla aynı.'
+};
+
+// Tek bir kartın işaretlemesi. Hem galeride hem baskı sayfasında AYNI bileşen
+// kullanılıyor - böylece bastığın şey ekranda gördüğünle birebir aynı oluyor.
+function cardMarkup(m, opts) {
+  opts = opts || {};
+  const hasImg = !!m.image;
+  const imgStyle = hasImg ? ` style="background-image:url('${esc(m.image)}')"` : '';
+  const kindKey = uriKind(m.uri);
+  const isPlaying = !opts.forPrint && currentState.nowPlayingCardId === m.cardId;
+  const picked = selectedForPrint.has(m.cardId);
+
+  // Playlist ve albüm kapaklarında ismin kendisi zaten görselin üstünde basılı
+  // geliyor; o yüzden başlığı ikincil (küçük, sönük) gösteriyoruz. Sanatçı
+  // kapaklarında isim yazmadığı için orada başlık belirgin kalıyor. Kapak
+  // görseli hiç yoksa, tür ne olursa olsun başlık yine belirgin.
+  const coverHasName = hasImg && (kindKey === 'playlist' || kindKey === 'album');
+  const titleClass = coverHasName ? 'title secondary' : 'title';
+
+  const classes = ['rfid-card'];
+  if (isPlaying) classes.push('playing');
+  if (opts.selectable) classes.push('selectable', picked ? 'picked' : 'unpicked');
+
+  // Ust bant: kendi marka logon (web/brand-logo.*) varsa o kullanilir,
+  // yoksa Volumio kelime logosuna dusulur.
+  const logoVolumio = assetMarkup('volumio', 'vlogo', 'Volumio', 'VOLUMIO_FALLBACK_MARKUP');
+  const hasBrand = currentState && currentState.assets && currentState.assets.brand;
+  const headLogo = hasBrand
+    ? '<img class="brandimg" src="' + assetUrl('brand-logo') + '" alt="mecaziradio">'
+    : logoVolumio;
+  const logoRaspberry = assetMarkup('raspberry', 'corner-logo', 'Raspberry Pi', 'RASPBERRY_FALLBACK_MARKUP');
+  const logoSpotify = assetMarkup('spotify', 'corner-logo', 'Spotify', 'SPOTIFY_FALLBACK_MARKUP');
+
+  return `
+    <div class="${classes.join(' ')}" data-card="${esc(m.cardId)}"
+         ${opts.forPrint ? '' : 'role="button" tabindex="0"'}
+         aria-label="${esc(m.name || m.uri)}">
+      ${hasImg ? `<div class="backdrop"${imgStyle}></div><div class="veil"></div>` : ''}
+      <div class="card-head">
+        ${headLogo}
+        ${RFID_SVG}
+      </div>
+      <div class="cover-wrap">
+        ${opts.selectable ? `<input type="checkbox" class="pick"${picked ? ' checked' : ''} aria-label="Baskı için seç">` : ''}
+        <div class="cover${hasImg ? '' : ' empty'}"${imgStyle}>
+          ${hasImg ? '' : '<div class="no-art">kapak görseli yok</div>'}
+        </div>
+        ${opts.forPrint || opts.selectable ? '' : '<button class="dots" title="Düzenle / Sil" aria-label="Düzenle veya sil">⋮</button>'}
+        ${isPlaying ? '<span class="playing-badge">▶ çalıyor</span>' : ''}
+        ${(!opts.forPrint && m.playCount > 0)
+          ? `<span class="plays" title="${esc(playsTitle(m))}">${m.playCount}×</span>` : ''}
+      </div>
+      <div class="card-body">
+        <div class="${titleClass}">${esc(m.name || m.uri)}</div>
+      </div>
+      <div class="card-foot">
+        ${logoSpotify}
+        ${logoRaspberry}
+      </div>
+    </div>`;
+}
+
+function showMsg(el, ok, text) {
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+  el.textContent = text;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
+
+async function api(path, method, body) {
+  const res = await fetch(path, {
+    method: method || 'GET',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const json = await res.json();
+  if (!res.ok || json.ok === false) throw new Error(json.error || ('HTTP ' + res.status));
+  return json;
+}
+
+function renderMappingList(filterText) {
+  const listEl = document.getElementById('mappingList');
+  const filt = (filterText || '').toLowerCase().trim();
+  const items = (currentState.mappings || []).filter((m) => {
+    if (!filt) return true;
+    return m.cardId.toLowerCase().includes(filt) || (m.name || '').toLowerCase().includes(filt) || m.uri.toLowerCase().includes(filt);
+  });
+
+  renderGallery(items);
+
+  if (items.length === 0) {
+    listEl.innerHTML = '<div style="padding:16px 0;color:var(--text-dim);font-size:13px;">Eşleştirme yok.</div>';
+    return;
+  }
+
+  listEl.innerHTML = items.map((m) => `
+    <div class="mapping-row">
+      <div class="info">
+        <div class="name">${esc(m.name || m.uri)}</div>
+        <div class="cardid">${esc(m.cardId)}</div>
+        ${m.name ? `<div class="uri">${esc(m.uri)}</div>` : ''}
+      </div>
+      <button class="danger" data-card="${esc(m.cardId)}" onclick="deleteMapping(this)">Sil</button>
+    </div>
+  `).join('');
+}
+
+async function deleteMapping(btn) {
+  const cardId = btn.getAttribute('data-card');
+  if (!confirm('Silinsin mi: ' + cardId + '?')) return;
+  try {
+    await api('/api/mappings/delete', 'POST', { card_id: cardId });
+    await refresh();
+  } catch (err) {
+    alert('Hata: ' + err.message);
+  }
+}
+
+async function refresh() {
+  currentState = await api('/api/state');
+
+  document.getElementById('connDot').className = 'dot on';
+  document.getElementById('stGrab').textContent = currentState.grabStatus || '-';
+  document.getElementById('stCount').textContent = currentState.cardCount + ' / ' + currentState.resolvedCount;
+
+  // Son okunan kart: numarasının yanında eşleşen listenin/sanatçının adı da yazsın.
+  document.getElementById('stLastCard').textContent = currentState.lastCardId || '-';
+  document.getElementById('stLastCardName').textContent =
+    currentState.lastCardId ? describeCard(currentState.lastCardId) : '';
+
+  // Şu an çalan (Spotify Connect'ten okunuyor).
+  const npCard = currentState.nowPlayingCardId;
+  const npTrack = currentState.nowPlayingTrack;
+  if (npCard) {
+    document.getElementById('stNowPlaying').textContent = describeCard(npCard);
+    const parts = [];
+    if (npTrack) parts.push(npTrack);
+    if (currentState.nowPlayingDevice) parts.push(currentState.nowPlayingDevice);
+    // Yerel çalmada bilgi Volumio'dan geliyor ve "son okutulan kart" çıkarımına
+    // dayanıyor - bunu gizlemek yerine belirtiyoruz.
+    if (currentState.nowPlayingSource === 'local') parts.push('son okutulan karta göre');
+    document.getElementById('stNowPlayingSub').textContent = parts.join(' · ');
+  } else if (npTrack) {
+    document.getElementById('stNowPlaying').textContent = npTrack;
+    document.getElementById('stNowPlayingSub').textContent =
+      'kart eşleşmesi yok' + (currentState.nowPlayingDevice ? ' · ' + currentState.nowPlayingDevice : '');
+  } else {
+    document.getElementById('stNowPlaying').textContent = currentState.connectAuthorized ? 'çalmıyor' : '-';
+    document.getElementById('stNowPlayingSub').textContent =
+      currentState.connectAuthorized ? '' : 'Spotify Connect yetkilendirilmedi';
+  }
+
+  document.getElementById('connectBannerOk').style.display = currentState.connectAuthorized ? 'flex' : 'none';
+  // redirectUri'yi sunucu göndermiyorsa, eklentinin eski kod sürümü çalışıyor
+  // demektir (Volumio index.js'i require önbelleğinden eski hâliyle
+  // çalıştırıyor olabiliyor). Yanlış adres göstermektense durumu açıkça
+  // söylüyoruz - yanlış adres kaydedilirse yetkilendirme yine patlar.
+  document.getElementById('codeVersion').textContent =
+    currentState.codeVersion ? ' · çalışan kod: v' + currentState.codeVersion : '';
+
+  const staleWarning = document.getElementById('staleWarning');
+  if (currentState.redirectUri) {
+    document.getElementById('redirectUri').textContent = currentState.redirectUri;
+    staleWarning.classList.remove('show');
+    document.getElementById('btnCopyRedirect').disabled = false;
+  } else {
+    document.getElementById('redirectUri').textContent = '(alınamadı)';
+    staleWarning.classList.add('show');
+    document.getElementById('btnCopyRedirect').disabled = true;
+  }
+
+  document.getElementById('backupBadge').textContent =
+    (currentState.cardCount || 0) + ' kart';
+
+  // Galeri sıralaması. Sunucu değeri SADECE ilk yüklemede geçerli; kullanıcı bu
+  // oturumda bir seçim yaptıysa (sortUserChosen) yoklama onu bir daha ezmiyor.
+  if (!sortUserChosen && currentState.gallerySort) {
+    currentSort = currentState.gallerySort;
+    const sortSel = document.getElementById('gallerySort');
+    if (!sortSel.matches(':focus')) sortSel.value = currentSort;
+    document.getElementById('sortHint').textContent = SORT_HINTS[currentSort] || '';
+  }
+
+  // Çalma yöntemi ve sabitlenmiş cihaz (kullanıcı o an düzenlemiyorsa).
+  const modeSel = document.getElementById('playbackMode');
+  if (!modeSel.matches(':focus')) modeSel.value = currentState.playbackMode || 'auto';
+  const devSel = document.getElementById('connectDevice');
+  const pinned = currentState.connectDeviceName || '';
+  document.getElementById('deviceBadge').textContent = pinned ? 'sabit: ' + pinned : 'otomatik';
+  if (!devSel.matches(':focus')) {
+    if (pinned && !Array.from(devSel.options).some((o) => o.value === pinned)) {
+      devSel.innerHTML += `<option value="${esc(pinned)}">${esc(pinned)}</option>`;
+    }
+    devSel.value = pinned;
+  }
+
+  const badge = document.getElementById('connectBadge');
+  badge.textContent = currentState.connectAuthorized ? 'tamamlandı ✓' : 'gerekli';
+  if (currentState.connectAuthorized && !connectSetupPinned) {
+    document.getElementById('connectSetup').style.display = 'none';
+  }
+
+  if (!document.getElementById('spClientId').matches(':focus')) {
+    document.getElementById('spClientId').value = currentState.spotifyClientId || '';
+  }
+
+  const banner = document.getElementById('unmatchedBanner');
+  if (currentState.lastUnmatchedCardId) {
+    banner.style.display = 'block';
+    banner.textContent = 'Tanınmayan kart okutuldu: ' + currentState.lastUnmatchedCardId + ' — aşağıya otomatik dolduruldu, Spotify URI girip kaydet.';
+    if (!document.getElementById('mapCardId').matches(':focus') && !document.getElementById('mapCardId').value) {
+      document.getElementById('mapCardId').value = currentState.lastUnmatchedCardId;
+    }
+  } else {
+    banner.style.display = 'none';
+  }
+
+  renderMappingList(document.getElementById('search').value);
+}
+
+document.getElementById('btnSaveSpotify').addEventListener('click', async () => {
+  const btn = document.getElementById('btnSaveSpotify');
+  btn.disabled = true;
+  try {
+    const result = await api('/api/spotify-credentials', 'POST', {
+      client_id: document.getElementById('spClientId').value,
+      client_secret: document.getElementById('spClientSecret').value
+    });
+    document.getElementById('spClientSecret').value = '';
+    if (result.result) {
+      showMsg(document.getElementById('msgSpotify'), true, 'Kaydedildi. İsimler güncellendi: ' + result.result.resolved + ' başarılı, ' + result.result.failed + ' başarısız.');
+    } else {
+      showMsg(document.getElementById('msgSpotify'), true, 'Kaydedildi (boş bırakıldıysa ham URI gösterilmeye devam eder).');
+    }
+    await refresh();
+  } catch (err) {
+    showMsg(document.getElementById('msgSpotify'), false, 'Hata: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btnRefreshNames').addEventListener('click', async () => {
+  const btn = document.getElementById('btnRefreshNames');
+  btn.disabled = true;
+  try {
+    const result = await api('/api/refresh-names', 'POST', {});
+    const r = result.result;
+    let text = 'İsimler güncellendi: ' + r.resolved + ' başarılı, ' + r.failed + ' başarısız.';
+    const kaynak = [];
+    if (r.viaOembed) kaynak.push(r.viaOembed + ' editoryal liste (oEmbed)');
+    if (r.viaLibrary) kaynak.push(r.viaLibrary + ' kişisel liste — Blend/Daily Mix/daylist (kitaplığın)');
+    if (kaynak.length) text += ' Kaynak: ' + kaynak.join(', ') + '.';
+    if (r.failed && r.lastError) text += ' Son hata: ' + r.lastError;
+    showMsg(document.getElementById('msgSpotify'), r.failed === 0, text);
+    await refresh();
+  } catch (err) {
+    // "Failed to fetch" sunucudan gelen bir hata DEĞİL - istek hiç tamamlanamadı
+    // demek. Ham mesajı göstermek kullanıcıya hiçbir şey anlatmıyor.
+    const cevapsiz = /failed to fetch|networkerror|load failed/i.test(err.message || '');
+    showMsg(document.getElementById('msgSpotify'), false, cevapsiz
+      ? 'Sunucudan cevap gelmedi — işlem çok uzun sürmüş olabilir. Sayfayı yenileyip ' +
+        'tekrar dene; isimlerin bir kısmı çekilmiş olabilir. Tekrarlıyorsa log\'a bak: ' +
+        'sudo journalctl -u volumio -n 50 | grep mecazicards'
+      : 'Hata: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btnSaveMapping').addEventListener('click', async () => {
+  const btn = document.getElementById('btnSaveMapping');
+  btn.disabled = true;
+  try {
+    const result = await api('/api/mappings', 'POST', {
+      card_id: document.getElementById('mapCardId').value,
+      spotify_uri: document.getElementById('mapUri').value
+    });
+    document.getElementById('mapCardId').value = '';
+    document.getElementById('mapUri').value = '';
+    showMsg(document.getElementById('msgMapping'), true, result.isUpdate ? 'Eşleştirme güncellendi.' : 'Eşleştirme eklendi.');
+    await refresh();
+  } catch (err) {
+    showMsg(document.getElementById('msgMapping'), false, 'Hata: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btnCopyRedirect').addEventListener('click', async () => {
+  const text = document.getElementById('redirectUri').textContent;
+  const btn = document.getElementById('btnCopyRedirect');
+  try {
+    // navigator.clipboard sadece https/localhost'ta çalışır; LAN IP'den
+    // açıldığında eski yöntemle kopyalıyoruz.
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    btn.textContent = 'Kopyalandı ✓';
+  } catch (err) {
+    btn.textContent = 'Kopyalanamadı, elle seç';
+  }
+  setTimeout(() => { btn.textContent = 'Kopyala'; }, 2500);
+});
+
+document.getElementById('btnReauthorize').addEventListener('click', () => {
+  connectSetupPinned = true;
+  document.getElementById('connectSetup').style.display = 'block';
+  document.getElementById('connectSetup').scrollIntoView({ behavior: 'smooth' });
+});
+
+document.getElementById('btnManualSubmit').addEventListener('click', async () => {
+  const btn = document.getElementById('btnManualSubmit');
+  const input = document.getElementById('manualRedirect');
+  btn.disabled = true;
+  try {
+    await api('/api/spotify-connect/manual', 'POST', { redirect_url: input.value });
+    input.value = '';
+    connectSetupPinned = false;
+    showMsg(document.getElementById('msgConnect'), true, 'Yetkilendirme başarılı! Artık kartlar Spotify Connect üzerinden çalacak.');
+    await refresh();
+  } catch (err) {
+    showMsg(document.getElementById('msgConnect'), false, 'Hata: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// -------------------- Kart detay penceresi --------------------
+let modalCardId = null;
+
+function openCardModal(cardId) {
+  const m = findMapping(cardId);
+  if (!m) return;
+  modalCardId = cardId;
+  document.getElementById('modalTitle').textContent = m.name || m.uri;
+  document.getElementById('modalKind').textContent = KIND_LABEL[uriKind(m.uri)] || '';
+  document.getElementById('modalCardId').textContent = m.cardId;
+  document.getElementById('modalUri').textContent = m.uri;
+  document.getElementById('modalCover').style.backgroundImage = m.image ? `url('${m.image}')` : 'none';
+  fillCustomFields(m);
+  document.getElementById('cardModal').classList.add('open');
+}
+
+function closeCardModal() {
+  modalCardId = null;
+  document.getElementById('cardModal').classList.remove('open');
+}
+
+// -------------------- Karta elle isim / görsel --------------------
+// Görseli TARAYICIDA küçültüyoruz: cihaza görsel işleme kütüphanesi kurmaya
+// gerek kalmıyor ve telefondan seçilen 4 MB'lık fotoğraf ağdan geçmiyor.
+// 800x800, kartın 44 mm'lik kapak alanı için 300 DPI'ın epey üstünde.
+const CUSTOM_IMAGE_SIZE = 800;
+
+function resizeImageToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type || file.type.indexOf('image/') !== 0) {
+      return reject(new Error('Bu bir görsel dosyası değil.'));
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        // Kapak alanı kare; görseli ortadan kare kırpıyoruz ki ezilmesin.
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = CUSTOM_IMAGE_SIZE;
+        canvas.height = CUSTOM_IMAGE_SIZE;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, CUSTOM_IMAGE_SIZE, CUSTOM_IMAGE_SIZE);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Görsel okunamadı.')); };
+    img.src = url;
+  });
+}
+
+function fillCustomFields(m) {
+  document.getElementById('customName').value = m && m.customName ? (m.name || '') : '';
+  document.getElementById('customImage').value = '';
+  const notes = [];
+  if (m && m.customName) notes.push('isim elle verildi');
+  if (m && m.customImage) notes.push('görsel elle verildi');
+  const note = document.getElementById('customNote');
+  note.textContent = notes.join(' · ');
+  note.style.display = notes.length ? '' : 'none';
+  const msg = document.getElementById('msgCustom');
+  if (msg) msg.style.display = 'none';
+}
+
+document.getElementById('btnCustomSave').addEventListener('click', async () => {
+  const cardId = modalCardId;
+  if (!cardId) return;
+  const btn = document.getElementById('btnCustomSave');
+  const msg = document.getElementById('msgCustom');
+  const file = document.getElementById('customImage').files[0];
+  btn.disabled = true;
+  try {
+    const payload = { cardId: cardId, name: document.getElementById('customName').value };
+    if (file) payload.image = await resizeImageToDataUrl(file);
+    await api('/api/card-info', 'POST', payload);
+    showMsg(msg, true, 'Kaydedildi.');
+    await refresh();
+    const m = findMapping(cardId);
+    if (m) { openCardModal(cardId); showMsg(document.getElementById('msgCustom'), true, 'Kaydedildi.'); }
+  } catch (err) {
+    showMsg(msg, false, 'Hata: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btnCustomReset').addEventListener('click', async () => {
+  const cardId = modalCardId;
+  if (!cardId) return;
+  if (!confirm('Elle verdiğin isim ve görsel silinsin mi?\n\nKart Spotify\'dan gelen bilgiye döner.')) return;
+  const btn = document.getElementById('btnCustomReset');
+  btn.disabled = true;
+  try {
+    await api('/api/card-info', 'POST', { cardId: cardId, name: '', clearImage: true });
+    await refresh();
+    openCardModal(cardId);
+    showMsg(document.getElementById('msgCustom'), true, 'Sıfırlandı.');
+  } catch (err) {
+    showMsg(document.getElementById('msgCustom'), false, 'Hata: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btnModalClose').addEventListener('click', closeCardModal);
+document.getElementById('cardModal').addEventListener('click', (e) => {
+  if (e.target.id === 'cardModal') closeCardModal();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCardModal(); });
+
+// "Eşleştirmeyi Değiştir": formu bu kartla doldur ve oraya götür.
+document.getElementById('btnModalEdit').addEventListener('click', () => {
+  const m = findMapping(modalCardId);
+  if (!m) return;
+  document.getElementById('mapCardId').value = m.cardId;
+  document.getElementById('mapUri').value = m.uri;
+  closeCardModal();
+  const form = document.getElementById('mapUri').closest('.card');
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('mapUri').focus();
+});
+
+document.getElementById('btnModalDelete').addEventListener('click', async () => {
+  const m = findMapping(modalCardId);
+  if (!m) return;
+  if (!confirm('Bu eşleştirme silinsin mi?\n\n' + (m.name || m.uri) + '\nKart: ' + m.cardId)) return;
+  try {
+    await api('/api/mappings/delete', 'POST', { card_id: m.cardId });
+    closeCardModal();
+    await refresh();
+  } catch (err) {
+    alert('Hata: ' + err.message);
+  }
+});
+
+// Galeride: karta tıklayınca düzenleme penceresi.
+// Baskı sekmesinde: karta tıklamak seçer/seçimi kaldırır.
+document.getElementById('mappingGallery').addEventListener('click', (e) => {
+  const card = e.target.closest('.rfid-card');
+  if (!card) return;
+  const cardId = card.getAttribute('data-card');
+
+  if (currentView === 'print') {
+    if (selectedForPrint.has(cardId)) selectedForPrint.delete(cardId);
+    else selectedForPrint.add(cardId);
+    card.classList.toggle('picked', selectedForPrint.has(cardId));
+    card.classList.toggle('unpicked', !selectedForPrint.has(cardId));
+    const box = card.querySelector('.pick');
+    if (box) box.checked = selectedForPrint.has(cardId);
+    updatePrintBar();
+    return;
+  }
+  openCardModal(cardId);
+});
+
+document.getElementById('mappingGallery').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const card = e.target.closest('.rfid-card');
+  if (!card) return;
+  e.preventDefault();
+  card.click();
+});
+
+// -------------------- Baskı sekmesi düğmeleri --------------------
+function visibleCardIds() {
+  return Array.from(document.querySelectorAll('#mappingGallery .rfid-card'))
+    .map((el) => el.getAttribute('data-card'));
+}
+
+document.getElementById('btnSelectAll').addEventListener('click', () => {
+  // Arama kutusuyla süzülmüş kartların hepsini seç.
+  visibleCardIds().forEach((id) => selectedForPrint.add(id));
+  renderMappingList(document.getElementById('search').value);
+});
+
+document.getElementById('btnSelectNone').addEventListener('click', () => {
+  selectedForPrint.clear();
+  renderMappingList(document.getElementById('search').value);
+});
+
+document.getElementById('printLight').addEventListener('change', () => {
+  if (selectedForPrint.size) buildPrintSheets();
+});
+
+document.getElementById('btnPrint').addEventListener('click', () => {
+  if (!selectedForPrint.size) return;
+  buildPrintSheets();
+  // Kapak görsellerinin yazdırmadan önce yüklenmesini bekle - yoksa bazı
+  // kartlar kapaksız basılabiliyor.
+  const imgs = Array.from(document.querySelectorAll('#printRoot img'));
+  const pending = imgs.filter((img) => !img.complete);
+  const go = () => setTimeout(() => window.print(), 120);
+  if (!pending.length) return go();
+  let left = pending.length;
+  const done = () => { if (--left <= 0) go(); };
+  pending.forEach((img) => { img.addEventListener('load', done); img.addEventListener('error', done); });
+  setTimeout(go, 3000); // en kötü ihtimalle yine de bas
+});
+
+// -------------------- Çalma yöntemi / hedef cihaz --------------------
+async function loadConnectDevices() {
+  const btn = document.getElementById('btnLoadDevices');
+  const sel = document.getElementById('connectDevice');
+  btn.disabled = true;
+  const previous = sel.value || (currentState && currentState.connectDeviceName) || '';
+  try {
+    const result = await api('/api/connect-devices');
+    sel.innerHTML = '<option value="">(otomatik seç)</option>' +
+      result.devices.map((d) =>
+        `<option value="${esc(d.name)}">${esc(d.name)} — ${esc(d.type)}${d.isActive ? ' (aktif)' : ''}</option>`
+      ).join('');
+    // Kayıtlı cihaz listede yoksa yine de seçenek olarak göster.
+    if (previous && !result.devices.some((d) => d.name === previous)) {
+      sel.innerHTML += `<option value="${esc(previous)}">${esc(previous)} (şu an görünmüyor)</option>`;
+    }
+    sel.value = previous;
+    showMsg(document.getElementById('msgPlayback'), true, result.devices.length + ' cihaz bulundu.');
+  } catch (err) {
+    showMsg(document.getElementById('msgPlayback'), false,
+      'Cihazlar alınamadı: ' + err.message + ' (Spotify Connect yetkilendirmesi gerekli.)');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btnLoadDevices').addEventListener('click', loadConnectDevices);
+
+// -------------------- Yedekle / geri yükle --------------------
+document.getElementById('btnBackup').addEventListener('click', () => {
+  // Sunucu Content-Disposition gönderiyor, tarayıcı doğrudan dosyaya kaydediyor.
+  window.location.href = '/api/backup';
+  showMsg(document.getElementById('msgBackup'), true,
+    'Yedek indiriliyor. Dosyayı cihazın dışında bir yerde sakla — SD kart ölürse ' +
+    'kurtaracak olan o.');
+});
+
+let restorePayload = null;
+
+document.getElementById('restoreFile').addEventListener('change', async (e) => {
+  const btn = document.getElementById('btnRestore');
+  const msg = document.getElementById('msgBackup');
+  const file = e.target.files && e.target.files[0];
+  restorePayload = null;
+  btn.disabled = true;
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    // Sunucu zaten sıkı doğruluyor; buradaki kontrol kullanıcıya HEMEN geri
+    // bildirim vermek için - yanlış dosyayı seçtiğini göndermeden önce anlasın.
+    if (!data || data.format !== 'mecazicards-backup') {
+      throw new Error('Bu bir mecazicards yedek dosyası değil.');
+    }
+    const n = Object.keys(data.mappings || {}).length;
+    if (!n) throw new Error('Dosyada eşleştirme yok.');
+    restorePayload = data;
+    btn.disabled = false;
+    showMsg(msg, true, n + ' eşleştirme içeren yedek okundu' +
+      (data.createdAt ? ' (' + data.createdAt.slice(0, 10) + ')' : '') +
+      '. Yöntemi seçip "Geri Yükle"ye bas.');
+  } catch (err) {
+    showMsg(msg, false, 'Dosya okunamadı: ' + err.message);
+  }
+});
+
+document.getElementById('btnRestore').addEventListener('click', async () => {
+  if (!restorePayload) return;
+  const btn = document.getElementById('btnRestore');
+  const msg = document.getElementById('msgBackup');
+  const mode = document.querySelector('input[name="restoreMode"]:checked').value;
+  const n = Object.keys(restorePayload.mappings || {}).length;
+
+  const uyari = (mode === 'replace')
+    ? 'DEĞİŞTİR seçili: mevcut tüm eşleştirmeler silinip yerine yedekteki ' + n +
+      ' kart konacak.\n\nDevam edilsin mi?'
+    : 'BİRLEŞTİR seçili: yedekteki ' + n + ' kart eklenecek/güncellenecek, ' +
+      'diğer kartların olduğu gibi kalacak.\n\nDevam edilsin mi?';
+  if (!window.confirm(uyari)) return;
+
+  btn.disabled = true;
+  try {
+    const r = await api('/api/restore', 'POST', { backup: restorePayload, mode: mode });
+    let text = 'Geri yüklendi: ' + r.before + ' → ' + r.after + ' kart (' +
+      r.restored + ' eşleştirme uygulandı).';
+    if (r.skipped && r.skipped.length) {
+      text += ' ' + r.skipped.length + ' geçersiz kayıt atlandı.';
+    }
+    if (r.snapshot) text += ' Önceki durum şuraya yazıldı: ' + r.snapshot;
+    showMsg(msg, true, text);
+    document.getElementById('restoreFile').value = '';
+    restorePayload = null;
+    await refresh();
+  } catch (err) {
+    showMsg(msg, false, 'Geri yükleme başarısız: ' + err.message);
+    btn.disabled = false;
+  }
+});
+
+// Sıralama seçimi: önce ekranı hemen güncelle (beklemesin), sonra cihaza yaz.
+// Kaydetme başarısız olsa bile bu oturumda seçim geçerli kalıyor - sıralama
+// tali bir tercih, bir ağ hatası yüzünden kullanıcıyı geri sürüklemek yanlış.
+document.getElementById('gallerySort').addEventListener('change', async (e) => {
+  currentSort = e.target.value;
+  sortUserChosen = true;
+  document.getElementById('sortHint').textContent = SORT_HINTS[currentSort] || '';
+  if (currentState) renderMappingList(document.getElementById('search').value);
+  try {
+    await api('/api/gallery-sort', 'POST', { sort: currentSort });
+  } catch (err) {
+    document.getElementById('sortHint').textContent =
+      'Sıralama bu oturumda uygulandı ama kaydedilemedi: ' + err.message;
+  }
+});
+
+document.getElementById('btnSavePlayback').addEventListener('click', async () => {
+  const btn = document.getElementById('btnSavePlayback');
+  btn.disabled = true;
+  try {
+    await api('/api/playback-mode', 'POST', { mode: document.getElementById('playbackMode').value });
+    await api('/api/connect-device', 'POST', { name: document.getElementById('connectDevice').value });
+    showMsg(document.getElementById('msgPlayback'), true, 'Kaydedildi.');
+    await refresh();
+  } catch (err) {
+    showMsg(document.getElementById('msgPlayback'), false, 'Hata: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('search').addEventListener('input', (e) => renderMappingList(e.target.value));
+
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>

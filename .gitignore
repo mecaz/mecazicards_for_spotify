@@ -1,0 +1,21 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Paketler
+*.zip
+
+# Yedekler / geçici
+*.yedek
+*.bak
+*.tmp
+mecazicards-yedek-*.json
+mecazicards-geri-yukleme-oncesi-*.json
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db
