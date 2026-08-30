@@ -19,3 +19,12 @@ mecazicards-geri-yukleme-oncesi-*.json
 # İşletim sistemi
 .DS_Store
 Thumbs.db
+
+# macOS "AppleDouble" artıkları
+._*
+.AppleDouble
+.AppleDB
+.AppleDesktop
+__MACOSX/
+.Spotlight-V100
+.Trashes
