@@ -1233,8 +1233,22 @@ async function refresh() {
   // demektir (Volumio index.js'i require önbelleğinden eski hâliyle
   // çalıştırıyor olabiliyor). Yanlış adres göstermektense durumu açıkça
   // söylüyoruz - yanlış adres kaydedilirse yetkilendirme yine patlar.
-  document.getElementById('codeVersion').textContent =
-    currentState.codeVersion ? ' · çalışan kod: v' + currentState.codeVersion : '';
+  // Çalışan kod ile diskteki sürüm ayrışırsa Volumio eski index.js'i require
+  // önbelleğinden çalıştırıyor demektir. Bu sessiz kaldığı için defalarca
+  // "yeni sürümü kurdum ama davranış eski" durumuna düştük - artık söylüyor.
+  const el = document.getElementById('codeVersion');
+  const kod = currentState.codeVersion;
+  const disk = currentState.diskVersion;
+  if (kod && disk && kod !== disk) {
+    el.textContent = ' · ÇALIŞAN KOD ESKİ: v' + kod + ' (diskte v' + disk +
+      ') — sudo systemctl restart volumio';
+    el.style.color = 'var(--amber)';
+    el.style.fontWeight = '600';
+  } else {
+    el.textContent = kod ? ' · çalışan kod: v' + kod : '';
+    el.style.color = '';
+    el.style.fontWeight = '';
+  }
 
   const staleWarning = document.getElementById('staleWarning');
   if (currentState.redirectUri) {

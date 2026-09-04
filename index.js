@@ -19,12 +19,36 @@ const HID_KEYMAP = {
 };
 const HID_ENTER_CODE = 40;
 
-// Bu sabit, DİSKTEKİ package.json'dan değil, o an BELLEKTE ÇALIŞAN koddan
-// geliyor. Volumio eklenti güncellemesinde index.js'i bazen require
-// önbelleğinden eski hâliyle çalıştırmaya devam edebiliyor (web/index.html ise
-// her başlangıçta diskten taze okunuyor) - böyle bir uyumsuzluk olduğunda
-// galeri sayfasında hangi kod sürümünün gerçekten çalıştığını görebilmek için.
-const PLUGIN_CODE_VERSION = '3.15.1';
+// Sürüm TEK KAYNAKTAN geliyor: package.json.
+//
+// Önce burada elle yazılı bir sabit vardı ve her sürümde iki dosyayı ayrı ayrı
+// güncellemek gerekiyordu. Onlarca sürüm sonra kaçınılmaz olan oldu: ikisi
+// birbirinden ayrıldı, arayüz eski sürümü gösterdi. İnsanın elle senkron
+// tutması gereken her şey er geç kayar - o yüzden artık kaymasi mümkün değil.
+//
+// require() önbelleklendiği için bu değer, modülün YÜKLENDİĞİ andaki sürümü
+// taşıyor. Yani hâlâ "bellekte çalışan kod" sürümü: Volumio eski index.js'i
+// require önbelleğinden çalıştırmaya devam ederse bu değer eski kalır, diskteki
+// package.json ise yeni olur. Teşhis yeteneğini kaybetmiyoruz - aşağıdaki
+// getDiskVersion() diskten TAZE okuyor, ikisi farklıysa arayüz uyarıyor.
+const PLUGIN_CODE_VERSION = (function () {
+  try {
+    return require('./package.json').version || 'bilinmiyor';
+  } catch (err) {
+    return 'bilinmiyor';
+  }
+})();
+
+// Diskteki güncel sürüm (önbelleksiz). PLUGIN_CODE_VERSION'dan farklıysa
+// Volumio eski kodu çalıştırıyor demektir; çözümü: sudo systemctl restart volumio
+function getDiskVersion() {
+  try {
+    const p = path.join(__dirname, 'package.json');
+    return (JSON.parse(fs.readFileSync(p, 'utf8')) || {}).version || null;
+  } catch (err) {
+    return null;
+  }
+}
 
 module.exports = ControllerMecazicards;
 
@@ -2109,6 +2133,7 @@ ControllerMecazicards.prototype.startWebServer = function () {
           connectAuthorized: !!(self.config.get('spotify_refresh_token') || '').trim(),
           redirectUri: self.getRedirectUri(),
           codeVersion: PLUGIN_CODE_VERSION,
+          diskVersion: getDiskVersion(),
           assets: {
             brand: !!(self.cardAssets && self.cardAssets.brand),
             volumio: !!(self.cardAssets && self.cardAssets.volumio),

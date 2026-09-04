@@ -1,6 +1,6 @@
 {
   "name": "mecazicards_for_spotify",
-  "version": "3.15.1",
+  "version": "3.16.0",
   "description": "RFID/NFC kart okuyucu ile Volumio üzerinde Spotify playlist/sanatçı çalma",
   "main": "index.js",
   "author": "mecaz",

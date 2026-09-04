@@ -88,6 +88,43 @@ Kart galerisindeki kartlar artık gerçek bir RFID kartı gibi **dikey** (ID-1 o
 
 Kapak görselleri artık kare bir alana yerleştiği için **tamamı görünüyor** (eski yatay tasarımda kare görselin altı üstü kırpılıyordu). Kapağın bulanık bir kopyası da kartın arka planına yayılıyor, böylece her kart kendi renk paletini alıyor.
 
+## v3.16.0 — sürüm artık tek kaynaktan
+
+Arayüzde "çalışan kod: v3.14.2" yazıyordu, oysa paket 3.15.1'di.
+
+Sebep: sürüm **iki yerde elle** tutuluyordu — `package.json` ve `index.js` içindeki `PLUGIN_CODE_VERSION` sabiti. Onlarca sürüm boyunca ikisi ayrı ayrı güncellendi; kaçınılmaz olan oldu ve ayrıştılar.
+
+Artık `index.js` sürümü `package.json`'dan okuyor. Elle senkron tutulacak bir şey kalmadı, dolayısıyla kayması da mümkün değil.
+
+**Teşhis yeteneği kaybolmadı, güçlendi.** `require()` önbelleklendiği için `PLUGIN_CODE_VERSION` hâlâ "bellekte çalışan kod" sürümünü taşıyor. Yanına diskten taze okunan `diskVersion` eklendi; ikisi ayrışırsa galeri artık **uyarıyor**:
+
+> ÇALIŞAN KOD ESKİ: v3.15.1 (diskte v3.16.0) — sudo systemctl restart volumio
+
+Bu durum daha önce birkaç kez sessizce yaşandı ("yeni sürümü kurdum ama davranış eski"). Artık sessiz değil.
+
+Ayrıca **paket bütünlüğü testi** eklendi: sürümün tek kaynaktan geldiğini, zorunlu dosyaların yerinde olduğunu, Volumio eklenti şartlarının sağlandığını, ve şablon `config.json`'da kimlik bilgisi ya da kişisel kart listesi kalmadığını doğruluyor.
+
+## v3.15.0 / v3.15.1 — tek komutla kurulum
+
+`guncelle.sh`: kodu GitHub'dan çeker, izinleri düzeltir, kurar, doğrular. Samba + `chown` + `chmod` döngüsünü ortadan kaldırıyor. Kart eşleştirmelerine ve ayarlara dokunmuyor.
+
+v3.15.1'de indirme komutu `curl -fsSL -o ... && bash` biçimine çevrildi: `curl | bash` kalıbı, dosya yoksa GitHub'ın döndürdüğü hata sayfasını bile komut olarak çalıştırmaya kalkıyordu (`404: command not found`).
+
+## v3.14.0 / v3.14.1 / v3.14.2 — kod incelemesi ve dayanıklı yedek
+
+Bağımsız bir kod incelemesi 29 bulgu çıkardı; en ağır on ikisi kapatıldı:
+
+- **`/spotify-connect/callback` içinde yansımalı XSS** — hata metni kaçırılmadan HTML'e basılıyordu ve o dal kimlik kontrolünden önce çalışıyor. Kaçırma eklendi.
+- **CSRF** — değiştirici tüm uçlara Origin kontrolü kondu; dışarıdaki bir sayfa artık kart silemez.
+- **HID akış sızıntısı** — okuyucu çıkarılıp takıldığında eski akış kapatılmıyordu; iki döngü sonra aynı baytları iki akış işliyor, tampon ikizleniyor ve hiçbir kart eşleşmiyordu.
+- **Kart tamponu** — zaman aşımı ve uzunluk sınırı eklendi; yarım kalan okuma bir sonrakine bulaşmıyor.
+- **Bozuk config yedeği eziyordu** — kontrol ham metne bakıyordu, artık gerçekten ayrıştırıyor. Yazma da atomik (geçici dosya + rename).
+- **Yedek dosyası 0644 idi** ve içinde Spotify secret'ı vardı — artık 0600.
+- **İsim yenileme askıda kalabiliyordu** — kaydetme hata verirse istek ne cevaplanıyor ne reddediliyordu ("Failed to fetch"in bir sebebi).
+- **Yedek eksikti** — elle verilen isim ve kapaklar dâhil edilmiyordu; SD kart ölümünde geri gelmeleri imkânsızdı.
+
+**v3.14.2'nin asıl bulgusu:** eklenti kaldırılınca Volumio ayar klasörünün tamamını siliyor — güvenlik yedeği de onunla gidiyordu. Yedeğin asıl yeri artık `/data/mecazicards-yedek/`, eklentiden bağımsız. `install.sh` sahipliği koşulsuz veriyor (önce "config varsa" bloğunun içindeydi ve temiz kurulumda atlanıyordu, klasör root'ta kalıyordu); eklenti yazamazsa artık sessiz kalmıyor.
+
 ## v3.13.1 — güncelleme artık HİÇBİR ayarı silmiyor
 
 v3.13.0 kart eşleştirmelerini kurtarıyordu ama sorun çok daha genişmiş. Paketteki `config.json` şablonu **boş** ve Volumio güncellemede canlı config'i onunla eziyor. Yani her güncelleme şunları siliyordu:
