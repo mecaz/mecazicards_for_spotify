@@ -59,15 +59,22 @@ curl -fsSL -o /tmp/guncelle.sh \
 > çalıştırmaya kalkıyor** (`404: command not found`). `-f` bayrağı curl'ün
 > hatada durmasını sağlıyor, `&&` de indirme başarısızsa çalıştırmayı engelliyor.
 
-Kodu GitHub'dan çeker, izinleri düzeltir, kurar ve doğrular. Samba'ya kopyalamaya,
-`chown`/`chmod` uğraşmaya gerek yok. Güncellemek için de aynı komut.
+Aynı komut hem ilk kurulum hem güncelleme: kuruluysa eski sürümü kaldırmadan
+yerinde günceller (kaldırma, Volumio'nun ayar klasörünü de siliyordu). İzinleri
+düzeltir, eklentiyi etkinleştirir, Volumio'yu yeniden başlatıp galerinin
+gerçekten açıldığını doğrular; açılmazsa sebebini logdan ekrana basar.
 
-Kart eşleştirmelerine ve ayarlarına **dokunmaz** — onlar `/data/mecazicards-yedek`
-altında duruyor.
+Kart eşleştirmelerine ve ayarlarına **dokunmaz**. Kurulumdan önce ve sonra kart
+sayısını gösterir; azalırsa uyarır. Kendi koyduğun logolar da korunur.
 
-Kurulum bitince Volumio arayüzünde **Plugins → mecazicards for Spotify → etkinleştir**.
+**Mac'ten:** Zip'i aç, klasördeki **Pi'ye kur.command** dosyasına çift tıkla.
+Klasör SSH ile doğrudan Pi'ye gider. İlk seferde macOS "tanınmayan geliştirici"
+derse sağ tıklayıp Aç'ı seç.
 
-> Bu script'i `sudo` ile çalıştırma; kendi içinde gereken yerde `sudo` kullanıyor.
+**Samba ile:** Klasörü ya da zip'i `/mnt/INTERNAL`'a at, SSH'ta ilk sefer
+`bash /mnt/INTERNAL/<klasör>/kur.sh`, sonraki her güncellemede `mecazicards-kur`.
+
+> Bu betikleri `sudo` ile çalıştırma; kendi içlerinde gereken yerde `sudo` kullanıyorlar.
 > `volumio plugin install` root olarak çağrılınca izin hatasıyla çöküyor.
 
 Aşağıdaki elle kurulum, internet erişimi olmayan cihazlar ve script'i kullanmak

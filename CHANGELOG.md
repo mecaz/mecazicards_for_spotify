@@ -88,6 +88,18 @@ Kart galerisindeki kartlar artık gerçek bir RFID kartı gibi **dikey** (ID-1 o
 
 Kapak görselleri artık kare bir alana yerleştiği için **tamamı görünüyor** (eski yatay tasarımda kare görselin altı üstü kırpılıyordu). Kapağın bulanık bir kopyası da kartın arka planına yayılıyor, böylece her kart kendi renk paletini alıyor.
 
+## v3.17.0 — galeri varsayılan, 12'lik sayfalar, tek komutla güncelleme
+
+**Galeri açılışta geliyor.** "Kayıtlı Eşleştirmeler" artık Liste yerine Kart Galerisi sekmesiyle açılıyor; sekme sırası da Galeri, Liste, Baskı oldu.
+
+**Galeri 12'şer kartlık sayfalar halinde.** Sonsuz uzayan liste yerine altta sayfa düğmeleri (‹ 1 2 3 ›) ve "13–24 / 57 kart" bilgisi. Galerinin içinde ayrı bir kaydırma alanı yapmadım: telefonda iç içe kaydırma parmağı kutunun içinde hapsediyor, sayfanın geri kalanına geçmek zorlaşıyor. 12, galerinin 4, 3 ve 2 sütunlu dizilimlerinin hepsine bölündüğü için sayfalar her ekranda tam sıralardan oluşuyor.
+- Klavyede ← →, dokunmatik ekranda galeride sola/sağa kaydırma ile de sayfa değişiyor.
+- Arama ya da sıralama değişince ilk sayfaya dönülüyor; 4 saniyelik otomatik yenileme bulunduğun sayfayı sıfırlamıyor.
+- Baskı sekmesi seçim için yine tüm kartları gösteriyor.
+- Telefonda galeri tek sütuna düşüyordu; artık en az 2 sütun.
+
+**Tek komutla kurulum ve güncelleme (`kur.sh`, kurulunca `mecazicards-kur`).** Önceki `guncelle.sh` sonunda `volumio plugin install` çağırıyordu; eklenti kuruluysa Volumio bunu reddediyor, önce kaldırmak gerekiyordu, kaldırma da ayar klasörünü siliyordu. Yeni kurucu kuruluysa eklenti dosyalarını yerinde değiştiriyor, canlı ayarlara hiç dokunmuyor, kart sayısını önce/sonra karşılaştırıyor ve galerinin açıldığını doğruluyor. `guncelle.sh` (GitHub) ve Mac'ten `Pi'ye kur.command` da aynı kurucuyu kullanıyor. Eski `/data/mecazicards-kaynak` klasörü ilk çalışmada temizleniyor.
+
 ## v3.16.0 — sürüm artık tek kaynaktan
 
 Arayüzde "çalışan kod: v3.14.2" yazıyordu, oysa paket 3.15.1'di.

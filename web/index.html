@@ -197,7 +197,9 @@
 
   .gallery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    /* Telefonda da en az 2 sütun: dar ekranda kart 155px'e sığmayınca tek
+       sütuna düşüp 12'lik sayfa 12 sıra oluyordu. */
+    grid-template-columns: repeat(auto-fill, minmax(min(155px, calc(50% - 8px)), 1fr));
     gap: 16px;
     margin-top: 4px;
   }
@@ -486,6 +488,30 @@
     .sheet.light svg circle[fill="rgba(255,255,255,.85)"] { fill: #444; }
     .sheet.light svg g[stroke="rgba(255,255,255,.85)"] { stroke: #444; }
   }
+  /* Galeri sayfaları. 12'lik sayfa: galeri genişliğe göre 4, 3 ya da 2
+     sütun oluyor; 12 üçüne de bölündüğü için sayfalar hep tam sıralardan
+     oluşuyor, yarım kalan sıra yok. */
+  .pager {
+    display: none; align-items: center; justify-content: center;
+    gap: 6px; margin-top: 18px; flex-wrap: wrap;
+  }
+  .pager.on { display: flex; }
+  .pager button {
+    margin: 0; min-width: 38px; height: 36px; padding: 0 10px;
+    background: var(--panel-2); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-weight: 500; font-variant-numeric: tabular-nums;
+  }
+  .pager button:hover:not(:disabled) { color: var(--text); border-color: var(--green); }
+  .pager button[aria-current="page"] {
+    background: var(--green); color: #04120a; border-color: var(--green); font-weight: 700;
+  }
+  .pager button:disabled { opacity: .35; cursor: default; }
+  .pager .gap { color: var(--text-dim); padding: 0 2px; }
+  .pager .range {
+    width: 100%; text-align: center; font-size: 12px; color: var(--text-dim);
+    margin-top: 2px; font-variant-numeric: tabular-nums;
+  }
   .gallery-note {
     grid-column: 1 / -1;
     font-size: 12px; color: var(--text-dim);
@@ -729,8 +755,8 @@
   <div class="card">
     <h2>Kayıtlı Eşleştirmeler</h2>
     <div class="view-tabs">
-      <button id="tabList" class="active" onclick="setView('list')">Liste</button>
-      <button id="tabGallery" onclick="setView('gallery')">Kart Galerisi</button>
+      <button id="tabGallery" class="active" onclick="setView('gallery')">Kart Galerisi</button>
+      <button id="tabList" onclick="setView('list')">Liste</button>
       <button id="tabPrint" onclick="setView('print')">Baskı</button>
     </div>
 
@@ -759,7 +785,7 @@
 
     <input class="search" id="search" placeholder="Kart ID veya isimde ara...">
 
-    <div class="sort-bar" id="sortBar" style="display:none;">
+    <div class="sort-bar" id="sortBar">
       <label for="gallerySort">Sıralama</label>
       <select id="gallerySort">
         <option value="score">Son zamanlarda en çok çalınan</option>
@@ -770,8 +796,9 @@
       <span class="sort-hint" id="sortHint"></span>
     </div>
 
-    <div class="mapping-list" id="mappingList"></div>
-    <div class="gallery-grid" id="mappingGallery" style="display:none;"></div>
+    <div class="mapping-list" id="mappingList" style="display:none;"></div>
+    <div class="gallery-grid" id="mappingGallery"></div>
+    <nav class="pager" id="galleryPager" aria-label="Galeri sayfaları"></nav>
   </div>
 </div>
 
@@ -822,7 +849,7 @@
 
 <script>
 let currentState = null;
-let currentView = 'list';
+let currentView = 'gallery';
 let connectSetupPinned = false;
 // Galeri sıralaması. Sunucudan geliyor (cihazda saklı), böylece telefonla
 // masaüstü aynı sırayı görüyor. Sunucu cevabı gelene kadar varsayılan.
@@ -912,6 +939,7 @@ function assetMarkup(key, cssClass, alt, fallbackGlobalName) {
 }
 
 function setView(view) {
+  if (view !== currentView) galleryPage = 0;
   currentView = view;
   document.getElementById('tabList').classList.toggle('active', view === 'list');
   document.getElementById('tabGallery').classList.toggle('active', view === 'gallery');
@@ -1008,11 +1036,101 @@ function renderGallery(items) {
   // geçerli, çünkü ekranda seçtiğin sırayla bastığın sıra aynı olmalı.
   const shown = (currentView === 'print') ? items : sortItems(items, currentSort);
 
-  galEl.innerHTML = note + shown.map((m) => cardMarkup(m, {
+  // Galeride 12'şer kart; baskı görünümü seçim için hepsini gösteriyor.
+  let pageItems = shown;
+  if (currentView === 'gallery') {
+    const pages = Math.max(1, Math.ceil(shown.length / GALLERY_PAGE_SIZE));
+    galleryPage = Math.min(Math.max(galleryPage, 0), pages - 1);
+    pageItems = shown.slice(galleryPage * GALLERY_PAGE_SIZE, (galleryPage + 1) * GALLERY_PAGE_SIZE);
+    renderPager(shown.length, pages);
+  } else {
+    renderPager(0, 0);
+  }
+
+  galEl.innerHTML = note + pageItems.map((m) => cardMarkup(m, {
     selectable: currentView === 'print'
   })).join('');
   if (currentView === 'print') updatePrintBar();
 }
+
+// -------------------- Galeri sayfaları --------------------
+// Sayfanın kendisi kayıyor, galerinin içinde ayrı bir kaydırma alanı YOK:
+// telefonda iç içe kaydırma parmağı kutunun içinde hapsediyor, sayfanın geri
+// kalanına geçemiyorsun. Onun yerine 12'lik sayfalar: galeri hep aynı
+// boyda kalıyor, kartlar sayfa sayfa geziliyor.
+const GALLERY_PAGE_SIZE = 12;
+let galleryPage = 0;
+
+function renderPager(total, pages) {
+  const el = document.getElementById('galleryPager');
+  if (pages <= 1) { el.classList.remove('on'); el.innerHTML = ''; return; }
+  const cur = galleryPage;
+  // 1 … 4 5 [6] 7 8 … 12 gibi: ilk, son ve etrafındaki iki sayfa
+  const nums = [];
+  for (let i = 0; i < pages; i++) {
+    if (i === 0 || i === pages - 1 || Math.abs(i - cur) <= 2) nums.push(i);
+    else if (nums[nums.length - 1] !== -1) nums.push(-1);
+  }
+  const from = cur * GALLERY_PAGE_SIZE + 1;
+  const to = Math.min(total, (cur + 1) * GALLERY_PAGE_SIZE);
+  el.innerHTML =
+    `<button type="button" data-page="${cur - 1}" ${cur === 0 ? 'disabled' : ''} aria-label="Önceki sayfa">‹</button>` +
+    nums.map((i) => i === -1 ? '<span class="gap">…</span>'
+      : `<button type="button" data-page="${i}" ${i === cur ? 'aria-current="page"' : ''}>${i + 1}</button>`).join('') +
+    `<button type="button" data-page="${cur + 1}" ${cur === pages - 1 ? 'disabled' : ''} aria-label="Sonraki sayfa">›</button>` +
+    `<div class="range">${from}–${to} / ${total} kart</div>`;
+  el.classList.add('on');
+}
+
+function goToGalleryPage(p) {
+  const before = galleryPage;
+  galleryPage = p;
+  if (currentState) renderMappingList(document.getElementById('search').value);
+  if (galleryPage === before) return;
+  // Galerinin üstü ekranın dışındaysa oraya kaydır ki yeni sayfa baştan görünsün
+  const top = document.getElementById('mappingGallery').getBoundingClientRect().top;
+  if (top < 0 || top > window.innerHeight * 0.6) {
+    document.querySelector('.view-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+document.getElementById('galleryPager').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-page]');
+  if (b && !b.disabled) goToGalleryPage(parseInt(b.dataset.page, 10));
+});
+
+// Klavye: ← → (bir alana yazı yazılmıyorsa ve açık pencere yoksa)
+document.addEventListener('keydown', (e) => {
+  if (currentView !== 'gallery' || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (document.querySelector('.modal-backdrop.open, .modal-backdrop.show')) return;
+  const pager = document.getElementById('galleryPager');
+  if (!pager.classList.contains('on')) return;
+  e.preventDefault();
+  goToGalleryPage(galleryPage + (e.key === 'ArrowRight' ? 1 : -1));
+});
+
+// Dokunmatik: galeride sola/sağa kaydırınca sayfa değişsin (dikey kaydırmayı bozmadan)
+(function () {
+  let x0 = null, y0 = null;
+  const g = document.getElementById('mappingGallery');
+  g.addEventListener('touchstart', (e) => {
+    if (currentView !== 'gallery' || e.touches.length !== 1) { x0 = null; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  g.addEventListener('touchend', (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    const dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 &&
+        document.getElementById('galleryPager').classList.contains('on')) {
+      goToGalleryPage(galleryPage + (dx < 0 ? 1 : -1));
+    }
+  }, { passive: true });
+})();
 
 // -------------------- Sıralama --------------------
 // Sunucu listeyi HER ZAMAN kart numarası sırasında gönderiyor; sıralamayı
@@ -1738,6 +1856,7 @@ document.getElementById('btnRestore').addEventListener('click', async () => {
 document.getElementById('gallerySort').addEventListener('change', async (e) => {
   currentSort = e.target.value;
   sortUserChosen = true;
+  galleryPage = 0;
   document.getElementById('sortHint').textContent = SORT_HINTS[currentSort] || '';
   if (currentState) renderMappingList(document.getElementById('search').value);
   try {
@@ -1763,7 +1882,7 @@ document.getElementById('btnSavePlayback').addEventListener('click', async () =>
   }
 });
 
-document.getElementById('search').addEventListener('input', (e) => renderMappingList(e.target.value));
+document.getElementById('search').addEventListener('input', (e) => { galleryPage = 0; renderMappingList(e.target.value); });
 
 refresh();
 setInterval(refresh, 4000);
